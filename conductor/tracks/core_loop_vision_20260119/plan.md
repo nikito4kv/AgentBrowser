@@ -36,7 +36,7 @@
     - [ ] Реализовать функции прокрутки и ожидания.
 - [ ] **Task: Conductor - User Manual Verification 'Phase 3: Action Layer (Basic Tools Implementation)' (Protocol in workflow.md)**
 
-## Phase 4: Logic Layer & Integration
+## Phase 4: Logic Layer & Integration [checkpoint: f8e2099]
 Интеграция с Gemini 2.0 Flash и запуск основного цикла работы агента.
 
 - [x] **Task 8: Интеграция с `google-genai` SDK** af662c3
