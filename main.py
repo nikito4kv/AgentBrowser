@@ -25,7 +25,13 @@ class Orchestrator:
             await self.browser.navigate("https://www.google.com")
             
             # Первый скриншот для инициации
-            screenshot, elements = await self.browser.capture_annotated_screenshot()
+            capture_result = await self.browser.capture_annotated_screenshot()
+            if capture_result is None:
+                print("DEBUG: capture_annotated_screenshot returned None!")
+                screenshot, elements = b"", []
+            else:
+                screenshot, elements = capture_result
+            
             elements_text = self._format_elements_data(elements)
             
             self.history.append(
@@ -86,14 +92,20 @@ class Orchestrator:
                 self.history.append(candidate.content) # Роль 'model'
                 
                 # Проверяем вызовы инструментов
-                tool_calls = [part.function_call for part in candidate.content.parts if part.function_call]
+                if candidate.content.parts:
+                    tool_calls = [part.function_call for part in candidate.content.parts if part.function_call]
+                else:
+                    tool_calls = []
                 
                 if not tool_calls:
-                    text_parts = [p.text for p in candidate.content.parts if p.text]
-                    if text_parts:
-                        console.print(f"[yellow]Агент:[/yellow] {text_parts[0]}")
+                    if candidate.content.parts:
+                        text_parts = [p.text for p in candidate.content.parts if p.text]
+                        if text_parts:
+                            console.print(f"[yellow]Агент:[/yellow] {text_parts[0]}")
+                        else:
+                            console.print("[yellow]Агент не предложил действий и не дал текстового ответа.[/yellow]")
                     else:
-                        console.print("[yellow]Агент не предложил действий и не дал текстового ответа.[/yellow]")
+                        console.print("[yellow]Агент вернул пустой ответ (без частей).[/yellow]")
                     break
 
                 # Выполняем инструменты и собираем ответы
@@ -129,7 +141,13 @@ class Orchestrator:
                         return
 
                 # После выполнения инструментов делаем новый скриншот и добавляем в историю как ответ пользователя
-                screenshot, elements = await self.browser.capture_annotated_screenshot()
+                capture_result = await self.browser.capture_annotated_screenshot()
+                if capture_result is None:
+                    print("DEBUG: capture_annotated_screenshot returned None inside loop!")
+                    screenshot, elements = b"", []
+                else:
+                    screenshot, elements = capture_result
+                
                 elements_text = self._format_elements_data(elements)
                 
                 responses_parts.append(
@@ -149,6 +167,8 @@ class Orchestrator:
                 await asyncio.sleep(1)
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             console.print(f"[bold red]Произошла ошибка в основном цикле:[/bold red] {str(e)}")
         finally:
             await self.browser.close()
