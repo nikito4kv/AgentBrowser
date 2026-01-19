@@ -130,6 +130,18 @@ class BrowserManager:
         import asyncio
         await asyncio.sleep(seconds)
 
+    async def go_back(self):
+        if self.page:
+            await self.page.go_back()
+
+    async def go_forward(self):
+        if self.page:
+            await self.page.go_forward()
+
+    async def reload(self):
+        if self.page:
+            await self.page.reload()
+
     async def close(self):
         if self.context:
             await self.context.close()
