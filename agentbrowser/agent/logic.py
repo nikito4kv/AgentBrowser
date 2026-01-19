@@ -182,7 +182,40 @@ class Agent:
             )
         ]
 
+    def _prune_history(self, history: list):
+        """
+        Удаляет старые скриншоты из истории, оставляя только текстовые пометки.
+        Оставляет скриншот в последнем сообщении (если он есть), чтобы агент видел текущее состояние.
+        """
+        pruned_history = []
+        for i, content in enumerate(history):
+            new_parts = []
+            is_last_message = (i == len(history) - 1)
+            
+            if content.parts:
+                for part in content.parts:
+                    # Проверяем наличие данных изображения
+                    # В SDK это может быть inline_data или file_data
+                    has_image = False
+                    if hasattr(part, "inline_data") and part.inline_data:
+                        has_image = True
+                    elif hasattr(part, "file_data") and part.file_data:
+                        has_image = True
+                    
+                    # Если есть картинка и это НЕ последнее сообщение -> заменяем на заглушку
+                    if has_image and not is_last_message:
+                        new_parts.append(types.Part.from_text(text="[Скриншот удален для экономии контекста]"))
+                    else:
+                        new_parts.append(part)
+            
+            pruned_history.append(types.Content(role=content.role, parts=new_parts))
+            
+        return pruned_history
+
     async def think(self, contents: list):
+        # Очищаем историю от старых скриншотов
+        pruned_contents = self._prune_history(contents)
+        
         config = types.GenerateContentConfig(
             system_instruction=self._get_system_instruction(),
             tools=self.get_tools()
@@ -190,7 +223,7 @@ class Agent:
         
         response = await self.client.aio.models.generate_content(
             model=self.model_id,
-            contents=contents,
+            contents=pruned_contents,
             config=config
         )
         
