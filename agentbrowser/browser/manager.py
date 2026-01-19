@@ -152,7 +152,14 @@ class BrowserManager:
         
         html = await self.page.content()
         from markdownify import markdownify
-        return markdownify(html, heading_style="ATX")
+        md = markdownify(html, heading_style="ATX")
+        
+        # Лимитируем контент для стабильности модели
+        limit = 10000
+        if len(md) > limit:
+            md = md[:limit] + "\n\n...[Контент обрезан для экономии контекста]..."
+            
+        return md.strip()
 
     async def close(self):
         if self.context:
