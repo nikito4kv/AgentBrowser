@@ -25,13 +25,14 @@ class Orchestrator:
             await self.browser.navigate("https://www.google.com")
             
             # Первый скриншот для инициации
-            screenshot = await self.browser.capture_annotated_screenshot()
+            screenshot, elements = await self.browser.capture_annotated_screenshot()
+            elements_text = self._format_elements_data(elements)
             
             self.history.append(
                 types.Content(
                     role="user",
                     parts=[
-                        types.Part.from_text(text=f"Задача: {user_prompt}"),
+                        types.Part.from_text(text=f"Задача: {user_prompt}\n\nИнтерактивные элементы на странице:\n{elements_text}"),
                         types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
                     ]
                 )
@@ -120,7 +121,12 @@ class Orchestrator:
                         return
 
                 # После выполнения инструментов делаем новый скриншот и добавляем в историю как ответ пользователя
-                screenshot = await self.browser.capture_annotated_screenshot()
+                screenshot, elements = await self.browser.capture_annotated_screenshot()
+                elements_text = self._format_elements_data(elements)
+                
+                responses_parts.append(
+                    types.Part.from_text(text=f"Текущее состояние страницы. Интерактивные элементы:\n{elements_text}")
+                )
                 responses_parts.append(
                     types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
                 )
@@ -138,6 +144,26 @@ class Orchestrator:
             console.print(f"[bold red]Произошла ошибка в основном цикле:[/bold red] {str(e)}")
         finally:
             await self.browser.close()
+
+    def _format_elements_data(self, elements: list[dict]) -> str:
+        lines = []
+        for el in elements:
+            info = f"ID {el['id']}: <{el['tagName']}>"
+            if el['text']:
+                info += f" '{el['text']}'"
+            if el['ariaLabel']:
+                info += f" aria-label='{el['ariaLabel']}'"
+            if el['placeholder']:
+                info += f" placeholder='{el['placeholder']}'"
+            if el['role']:
+                info += f" role='{el['role']}'"
+            lines.append(info)
+        
+        # Ограничиваем количество элементов в текстовом описании для экономии контекста
+        if len(lines) > 50:
+             lines = lines[:50] + ["...[Список элементов обрезан]..."]
+             
+        return "\n".join(lines) if lines else "Нет видимых интерактивных элементов."
 
     async def execute_tool(self, call):
         name = call.name

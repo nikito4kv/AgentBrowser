@@ -28,7 +28,7 @@ async def test_orchestrator_recovery_on_empty_response():
         with patch.object(orch.browser, 'start', new_callable=AsyncMock):
             with patch.object(orch.browser, 'navigate', new_callable=AsyncMock):
                 with patch.object(orch.browser, 'capture_annotated_screenshot', new_callable=AsyncMock) as mock_screenshot:
-                    mock_screenshot.return_value = b"fake_image"
+                    mock_screenshot.return_value = (b"fake_image", [])
                     with patch.object(orch.browser, 'close', new_callable=AsyncMock):
                         # Запускаем run. Он должен войти в цикл, получить пустой ответ, 
                         # откатиться, добавить сообщение об ошибке и попробовать снова.
