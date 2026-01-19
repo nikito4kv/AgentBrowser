@@ -122,6 +122,12 @@ class Orchestrator:
             if name == "navigate":
                 await self.browser.navigate(args["url"])
                 return f"Перешли на {args['url']}"
+            elif name == "update_plan":
+                self.agent.update_plan(args["steps"], args["current_step_index"])
+                return "План обновлен"
+            elif name == "save_memory":
+                self.agent.save_memory(args["key"], args["value"])
+                return f"Сохранено в память: {args['key']} = {args['value']}"
             elif name == "go_back":
                 await self.browser.go_back()
                 return "Вернулись назад"

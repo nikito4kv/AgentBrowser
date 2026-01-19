@@ -6,6 +6,9 @@ class Agent:
     def __init__(self, api_key: str, model_id: str = "gemini-2.0-flash"):
         self.client = genai.Client(api_key=api_key)
         self.model_id = model_id
+        self.plan = []
+        self.current_step = 0
+        self.memory = {}
         self.system_instruction = """
 Ты — AI-агент, управляющий браузером. Твоя цель — выполнять задачи пользователя, используя предоставленные инструменты.
 Тебе будет присылаться скриншот страницы с наложенными числовыми метками (лейблами) на интерактивных элементах.
@@ -30,6 +33,13 @@ class Agent:
 5. Всегда используй label_id из визуальных меток на скриншоте.
 """
 
+    def update_plan(self, steps: list, current_step: int):
+        self.plan = steps
+        self.current_step = current_step
+
+    def save_memory(self, key: str, value: str):
+        self.memory[key] = value
+
     def get_tools(self):
         return [
             types.Tool(
@@ -43,6 +53,30 @@ class Agent:
                                 "url": types.Schema(type="STRING", description="Полный URL адрес (https://...).")
                             },
                             required=["url"]
+                        )
+                    ),
+                    types.FunctionDeclaration(
+                        name="update_plan",
+                        description="Создать или обновить план действий.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "steps": types.Schema(type="ARRAY", items=types.Schema(type="STRING"), description="Список шагов."),
+                                "current_step_index": types.Schema(type="INTEGER", description="Индекс текущего шага (0-based).")
+                            },
+                            required=["steps", "current_step_index"]
+                        )
+                    ),
+                    types.FunctionDeclaration(
+                        name="save_memory",
+                        description="Сохранить важный факт или данные в память.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "key": types.Schema(type="STRING", description="Ключ для сохранения."),
+                                "value": types.Schema(type="STRING", description="Значение для сохранения.")
+                            },
+                            required=["key", "value"]
                         )
                     ),
                     types.FunctionDeclaration(
