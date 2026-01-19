@@ -22,40 +22,51 @@ class Orchestrator:
         try:
             console.print(f"[bold blue]Задача:[/bold blue] {user_prompt}")
             
-            # Начальная навигация на google, если мы еще нигде
             await self.browser.navigate("https://www.google.com")
+            
+            # Первый скриншот для инициации
+            screenshot = await self.browser.capture_annotated_screenshot()
+            
+            self.history.append(
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part.from_text(text=f"Задача: {user_prompt}"),
+                        types.Part.from_bytes(data=screenshot, mime_type="image/png")
+                    ]
+                )
+            )
             
             while True:
                 console.print("[blue]Агент думает...[/blue]")
                 
-                # 1. Observe
-                screenshot = await self.browser.capture_annotated_screenshot()
+                response = await self.agent.think(self.history)
                 
-                # 2. Think
-                response = await self.agent.think(user_prompt, screenshot, self.history)
-                
-                # Анализируем ответ
                 if not response.candidates:
-                    console.print("[red]Нет ответа от модели.[/red]")
+                    console.print("[red]Нет ответа от модели (возможно, сработал фильтр безопасности).[/red]")
+                    if hasattr(response, 'prompt_feedback'):
+                         console.print(f"Feedback: {response.prompt_feedback}")
                     break
                     
                 candidate = response.candidates[0]
-                self.history.append(candidate.content)
+                self.history.append(candidate.content) # Роль 'model'
                 
                 # Проверяем вызовы инструментов
-                tool_calls = [part.call for part in candidate.content.parts if part.call]
+                tool_calls = [part.function_call for part in candidate.content.parts if part.function_call]
                 
                 if not tool_calls:
-                    if candidate.content.parts:
-                        text_parts = [p.text for p in candidate.content.parts if p.text]
-                        if text_parts:
-                            console.print(f"[yellow]Агент:[/yellow] {text_parts[0]}")
+                    text_parts = [p.text for p in candidate.content.parts if p.text]
+                    if text_parts:
+                        console.print(f"[yellow]Агент:[/yellow] {text_parts[0]}")
+                    else:
+                        console.print("[yellow]Агент не предложил действий и не дал текстового ответа.[/yellow]")
                     break
 
+                # Выполняем инструменты и собираем ответы
+                responses_parts = []
                 for call in tool_calls:
                     console.print(f"[green]Действие:[/green] {call.name}({call.args})")
                     
-                    # Retry механизм
                     max_retries = 3
                     result = "Ошибка"
                     for attempt in range(max_retries):
@@ -67,30 +78,39 @@ class Orchestrator:
                     
                     if "Ошибка" in result or "Элемент не найден" in result:
                         console.print(f"[bold red]Критическая ошибка:[/bold red] {result}")
-                        # Здесь можно добавить input() для запроса помощи у пользователя
                         user_help = console.input("[bold yellow]Агенту нужна помощь. Что делать? (или 'exit' для выхода): [/bold yellow]")
                         if user_help.lower() == 'exit':
                             return
                         result = f"Пользователь подсказал: {user_help}"
 
-                    # Передаем результат обратно в историю
-                    self.history.append(
-                        types.Content(
-                            role="user",
-                            parts=[types.Part.from_function_response(
-                                name=call.name,
-                                response={"result": result}
-                            )]
+                    responses_parts.append(
+                        types.Part.from_function_response(
+                            name=call.name,
+                            response={"result": result}
                         )
                     )
                     
                     if call.name == "task_completed":
                         console.print(f"[bold green]Задача завершена![/bold green] {call.args.get('result', '')}")
                         return
+
+                # После выполнения инструментов делаем новый скриншот и добавляем в историю как ответ пользователя
+                # screenshot = await self.browser.capture_annotated_screenshot()
+                # responses_parts.append(
+                #    types.Part.from_bytes(data=screenshot, mime_type="image/png")
+                # )
                 
-                # Небольшая пауза между шагами
+                self.history.append(
+                    types.Content(
+                        role="user",
+                        parts=responses_parts
+                    )
+                )
+                
                 await asyncio.sleep(1)
 
+        except Exception as e:
+            console.print(f"[bold red]Произошла ошибка в основном цикле:[/bold red] {str(e)}")
         finally:
             await self.browser.close()
 

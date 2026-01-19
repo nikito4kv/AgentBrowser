@@ -45,7 +45,23 @@ class BrowserManager:
         await self.page.evaluate(js_code)
         
         # Делаем скриншот
-        return await self.page.screenshot(type="png", full_page=False)
+        png_bytes = await self.page.screenshot(type="png", full_page=False)
+        
+        # Оптимизация через Pillow
+        from PIL import Image
+        import io
+        
+        img = Image.open(io.BytesIO(png_bytes))
+        # Ресайз если слишком большой (например, макс 1024 по ширине)
+        max_width = 1024
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_height = int(img.height * ratio)
+            img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+            
+        out_io = io.BytesIO()
+        img.save(out_io, format="PNG", optimize=True)
+        return out_io.getvalue()
 
     async def click_element(self, label_id: int) -> bool:
         if not self.page:
