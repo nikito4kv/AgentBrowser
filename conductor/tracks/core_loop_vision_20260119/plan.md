@@ -1,6 +1,6 @@
 # Plan: Разработка ядра автономного агента (Core Loop & Vision)
 
-## Phase 1: Environment Setup & Browser Initialization
+## Phase 1: Environment Setup & Browser Initialization [checkpoint: cf9d970]
 Инициализация проекта, настройка зависимостей и базового управления браузером.
 
 - [x] **Task 1: Настройка проекта с использованием `uv`** 0117a6f
