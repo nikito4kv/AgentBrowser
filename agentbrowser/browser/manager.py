@@ -78,6 +78,7 @@ class BrowserManager:
             img = img.convert('RGB')
             
         img.save(out_io, format="JPEG", quality=70, optimize=True)
+        # print(f"DEBUG: Returning screenshot {len(out_io.getvalue())} bytes and {len(elements_data)} elements")
         return out_io.getvalue(), elements_data
 
     async def click_element(self, label_id: int) -> bool:
@@ -130,6 +131,11 @@ class BrowserManager:
                 # Попытка 1: Обычный ввод
                 await element.fill("", timeout=2000)
                 await element.type(text, timeout=2000)
+                if "\n" in text:
+                    try:
+                        await self.page.wait_for_load_state("load", timeout=3000)
+                    except:
+                        pass
                 return True
             except Exception:
                 # Попытка 2: JS ввод
@@ -138,8 +144,16 @@ class BrowserManager:
                         el.value = val; 
                         el.dispatchEvent(new Event('input', { bubbles: true }));
                         el.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (val.includes('\\n')) {
+                            el.form.submit();
+                        }
                     }"""
                     await element.evaluate(js_code, text)
+                    if "\n" in text:
+                        try:
+                            await self.page.wait_for_load_state("load", timeout=3000)
+                        except:
+                            pass
                     return True
                 except Exception:
                     pass
