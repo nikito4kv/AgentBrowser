@@ -39,7 +39,7 @@
 ## Phase 4: Logic Layer & Integration
 Интеграция с Gemini 2.0 Flash и запуск основного цикла работы агента.
 
-- [ ] **Task 8: Интеграция с `google-genai` SDK**
+- [x] **Task 8: Интеграция с `google-genai` SDK** af662c3
     - [ ] Написать тесты для мокированного вызова API Gemini.
     - [ ] Реализовать класс `Agent` для взаимодействия с моделью, включая системный промпт и передачу скриншотов.
 - [ ] **Task 9: Реализация Core Loop (Observe-Think-Act)**
