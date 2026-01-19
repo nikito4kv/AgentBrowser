@@ -42,7 +42,18 @@ class BrowserManager:
         with open(js_path, "r", encoding="utf-8") as f:
             js_code = f.read()
             
-        elements_data = await self.page.evaluate(js_code)
+        try:
+            # Ждем загрузки сети, чтобы не ловить destroyed context
+            try:
+                await self.page.wait_for_load_state("domcontentloaded", timeout=2000)
+            except:
+                pass
+
+            elements_data = await self.page.evaluate(js_code)
+        except Exception as e:
+            # Если контекст умер или JS упал, возвращаем пустой список
+            print(f"Annotation error: {e}")
+            elements_data = []
         
         # Делаем скриншот
         png_bytes = await self.page.screenshot(type="jpeg", quality=70, full_page=False)
@@ -77,17 +88,29 @@ class BrowserManager:
             try:
                 # Попытка 1: Обычный клик с коротким таймаутом
                 await element.click(timeout=2000)
+                try:
+                    await self.page.wait_for_load_state("load", timeout=3000)
+                except:
+                    pass
                 return True
             except Exception:
                 # Если обычный клик не прошел (например, перекрытие), пробуем JS Click
                 # Это надежнее, чем force=True, так как вызывает событие напрямую на элементе
                 try:
                     await element.evaluate("el => el.click()")
+                    try:
+                        await self.page.wait_for_load_state("load", timeout=3000)
+                    except:
+                        pass
                     return True
                 except Exception:
                     # Если и JS не помог (маловероятно), пробуем Force Click как последнюю надежду
                     try:
                         await element.click(force=True, timeout=2000)
+                        try:
+                            await self.page.wait_for_load_state("load", timeout=3000)
+                        except:
+                            pass
                         return True
                     except Exception:
                         pass
