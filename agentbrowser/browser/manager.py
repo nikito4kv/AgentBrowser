@@ -47,6 +47,17 @@ class BrowserManager:
         # Делаем скриншот
         return await self.page.screenshot(type="png", full_page=False)
 
+    async def click_element(self, label_id: int) -> bool:
+        if not self.page:
+            return False
+        
+        selector = f"[data-agent-id='{label_id}']"
+        element = await self.page.query_selector(selector)
+        if element:
+            await element.click()
+            return True
+        return False
+
     async def close(self):
         if self.context:
             await self.context.close()
