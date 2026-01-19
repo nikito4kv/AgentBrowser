@@ -6,7 +6,7 @@
 - [x] **Task 1: Настройка проекта с использованием `uv`** 0117a6f
     - [ ] Создать `pyproject.toml` и установить зависимости: `playwright`, `google-genai`, `pillow`, `python-dotenv`, `rich`, `pytest`, `pytest-cov`.
     - [ ] Настроить `.env` для `GEMINI_API_KEY`.
-- [ ] **Task 2: Реализация базового контроллера браузера**
+- [x] **Task 2: Реализация базового контроллера браузера** 880b422
     - [ ] Написать тесты для инициализации Playwright и открытия страницы.
     - [ ] Реализовать класс `BrowserManager` для управления сессией и навигацией.
 - [ ] **Task: Conductor - User Manual Verification 'Phase 1: Environment Setup & Browser Initialization' (Protocol in workflow.md)**
