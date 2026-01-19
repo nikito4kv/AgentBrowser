@@ -10,7 +10,7 @@
 - [x] **Task 2: Интеграция инструментов в get_tools** cd8f560
     - [ ] Добавить определения `update_plan` и `save_memory` в `get_tools`.
     - [ ] Обновить `execute_tool` в `main.py` для обработки этих вызовов.
-- [ ] **Task: Conductor - User Manual Verification 'Phase 1: Logic & Tools Implementation' (Protocol in workflow.md)**
+- [x] **Task: Conductor - User Manual Verification 'Phase 1: Logic & Tools Implementation' (Protocol in workflow.md)**
 
 ## Phase 2: System Prompt & Integration [checkpoint: 07603f0]
 Обновление системного промпта для использования новых возможностей и интеграция в основной цикл.
@@ -21,4 +21,18 @@
 - [x] **Task 4: Верификация на сложном сценарии** c381581
     - [ ] Создать скрипт верификации, эмулирующий многошаговую задачу (или запустить вручную).
     - [ ] Убедиться, что агент создает план и следует ему.
-- [ ] **Task: Conductor - User Manual Verification 'Phase 2: System Prompt & Integration' (Protocol in workflow.md)**
+- [x] **Task: Conductor - User Manual Verification 'Phase 2: System Prompt & Integration' (Protocol in workflow.md)**
+
+## Phase 3: Cognitive Refinement
+Улучшение качества принятия решений через Chain-of-Thought, семантическую привязку и самокоррекцию.
+
+- [x] **Task 5: Chain-of-Thought (CoT) Implementation** cd8f560
+    - [x] Обновить системный промпт: обязать агента выводить блок `THOUGHT` перед вызовом инструментов.
+    - [x] Описать структуру мыслительного процесса: Observation -> Analysis -> Plan -> Action.
+- [~] **Task 6: Самокоррекция и проверка состояния**
+    - [ ] Добавить в промпт инструкции по проверке успешности предыдущего действия (сравнение состояний).
+    - [ ] Реализовать логику "если скриншот не изменился после клика -> попробовать другой селектор или wait".
+- [ ] **Task 7: Тестирование на реальном кейсе (GitHub Search)**
+    - [ ] Создать скрипт для запуска сценария "Найти самый популярный репо на GitHub".
+    - [ ] Отладить промпт и логику на основе логов выполнения.
+- [ ] **Task: Conductor - User Manual Verification 'Phase 3: Cognitive Refinement' (Protocol in workflow.md)**

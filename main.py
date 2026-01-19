@@ -106,6 +106,12 @@ class Orchestrator:
 
                 self.history.append(candidate.content) # Роль 'model'
                 
+                # Выводим мыслительный процесс (если есть)
+                if candidate.content.parts:
+                    text_parts = [p.text for p in candidate.content.parts if p.text]
+                    if text_parts:
+                        console.print(f"[bold cyan]Мысли агента:[/bold cyan]\n{text_parts[0]}")
+
                 # Проверяем вызовы инструментов
                 if candidate.content.parts:
                     tool_calls = [part.function_call for part in candidate.content.parts if part.function_call]
@@ -116,7 +122,7 @@ class Orchestrator:
                     if candidate.content.parts:
                         text_parts = [p.text for p in candidate.content.parts if p.text]
                         if text_parts:
-                            console.print(f"[yellow]Агент:[/yellow] {text_parts[0]}")
+                            # console.print(f"[yellow]Агент:[/yellow] {text_parts[0]}") # Уже вывели выше
                             # Добавляем пинок, если агент просто болтает
                             self.history.append(
                                 types.Content(
@@ -181,17 +187,26 @@ class Orchestrator:
                 capture_result = await self.browser.capture_annotated_screenshot()
                 if capture_result is None:
                     print("DEBUG: capture_annotated_screenshot returned None inside loop!")
-                    screenshot, elements = b"", []
+                    new_screenshot, elements = b"", []
                 else:
-                    screenshot, elements = capture_result
+                    new_screenshot, elements = capture_result
                 
                 elements_text = self._format_elements_data(elements)
                 
+                status_msg = f"Текущее состояние страницы. Интерактивные элементы:\n{elements_text}"
+                
+                # Проверка на идентичность скриншота (Самокоррекция)
+                if hasattr(self, 'last_screenshot') and self.last_screenshot == new_screenshot:
+                    status_msg = "ВНИМАНИЕ: Скриншот не изменился после твоего последнего действия! " \
+                                "Возможно, клик не сработал или страница загружается. Попробуй другое действие.\n\n" + status_msg
+                
+                self.last_screenshot = new_screenshot
+
                 responses_parts.append(
-                    types.Part.from_text(text=f"Текущее состояние страницы. Интерактивные элементы:\n{elements_text}")
+                    types.Part.from_text(text=status_msg)
                 )
                 responses_parts.append(
-                    types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
+                    types.Part.from_bytes(data=new_screenshot, mime_type="image/jpeg")
                 )
                 
                 self.history.append(
@@ -262,6 +277,9 @@ class Orchestrator:
             elif name == "type_text":
                 success = await self.browser.type_text(args["label_id"], args["text"])
                 return "Успешно" if success else "Элемент не найден"
+            elif name == "press_key":
+                success = await self.browser.press_key(args["key"])
+                return f"Нажата клавиша {args['key']}" if success else "Ошибка нажатия"
             elif name == "scroll":
                 await self.browser.scroll(args["direction"])
                 return "Прокручено"

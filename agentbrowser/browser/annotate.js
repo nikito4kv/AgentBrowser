@@ -13,6 +13,11 @@
     const elementData = [];
 
     elements.forEach(el => {
+        // HACK: Убираем target="_blank", чтобы агент не терял контекст при открытии новых вкладок
+        if (el.tagName === 'A' && el.getAttribute('target')) {
+            el.removeAttribute('target');
+        }
+
         // Проверка видимости
         const rect = el.getBoundingClientRect();
         const style = window.getComputedStyle(el);

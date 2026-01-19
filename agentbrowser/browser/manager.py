@@ -85,26 +85,52 @@ class BrowserManager:
         if not self.page:
             return False
         
+        # Запоминаем текущий список страниц, чтобы отловить открытие новой вкладки
+        initial_pages = self.context.pages
+        
         selector = f"[data-agent-id='{label_id}']"
         element = await self.page.query_selector(selector)
         if element:
             try:
                 # Попытка 1: Обычный клик с коротким таймаутом
                 await element.click(timeout=2000)
-                try:
-                    await self.page.wait_for_load_state("load", timeout=3000)
-                except:
-                    pass
+                
+                # Проверяем, не открылась ли новая вкладка
+                if len(self.context.pages) > len(initial_pages):
+                    # Переключаемся на новую вкладку
+                    self.page = self.context.pages[-1]
+                    await self.page.bring_to_front()
+                    try:
+                        await self.page.wait_for_load_state("domcontentloaded", timeout=5000)
+                    except:
+                        pass
+                else:
+                    # Обычное ожидание загрузки в текущей вкладке
+                    try:
+                        await self.page.wait_for_load_state("load", timeout=3000)
+                    except:
+                        pass
+                        
                 return True
             except Exception:
                 # Если обычный клик не прошел (например, перекрытие), пробуем JS Click
                 # Это надежнее, чем force=True, так как вызывает событие напрямую на элементе
                 try:
                     await element.evaluate("el => el.click()")
-                    try:
-                        await self.page.wait_for_load_state("load", timeout=3000)
-                    except:
-                        pass
+                    
+                    # Проверяем новую вкладку и для JS клика
+                    if len(self.context.pages) > len(initial_pages):
+                        self.page = self.context.pages[-1]
+                        await self.page.bring_to_front()
+                        try:
+                            await self.page.wait_for_load_state("domcontentloaded", timeout=5000)
+                        except:
+                            pass
+                    else:
+                        try:
+                            await self.page.wait_for_load_state("load", timeout=3000)
+                        except:
+                            pass
                     return True
                 except Exception:
                     # Если и JS не помог (маловероятно), пробуем Force Click как последнюю надежду
@@ -159,6 +185,20 @@ class BrowserManager:
                     pass
                     
         return False
+
+    async def press_key(self, key: str) -> bool:
+        if not self.page:
+            return False
+        try:
+            await self.page.keyboard.press(key)
+            try:
+                await self.page.wait_for_load_state("load", timeout=3000)
+            except:
+                pass
+            return True
+        except Exception as e:
+            print(f"Error pressing key {key}: {e}")
+            return False
 
     async def scroll(self, direction: str, amount: str = "window.innerHeight"):
         if not self.page:
