@@ -41,7 +41,15 @@ class Orchestrator:
             while True:
                 console.print("[blue]Агент думает...[/blue]")
                 
-                response = await self.agent.think(self.history)
+                try:
+                    response = await self.agent.think(self.history)
+                except Exception as e:
+                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                        console.print("[yellow]Предупреждение: Лимит запросов API (429). Ждем 10 секунд перед повтором...[/yellow]")
+                        await asyncio.sleep(10)
+                        continue
+                    else:
+                        raise e
                 
                 if not response.candidates:
                     if not hasattr(self, 'recovery_attempts'):

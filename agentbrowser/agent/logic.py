@@ -29,7 +29,8 @@ class Agent:
 
 Правила:
 1. Если пользователь дал URL или домен, используй `navigate`. Если запрос поисковый ("найди..."), используй поиск на текущей странице (Google).
-2. Для сложных задач ВСЕГДА сначала создай план с помощью `update_plan`.
+2. Тебе предоставлен текстовый список интерактивных элементов с их описанием (SoM 2.0). ВСЕГДА сверяй label_id со списком, чтобы не нажать на неверный элемент (например, не путай 'Поиск по картинке' и 'Поиск').
+3. Для сложных задач ВСЕГДА сначала создай план с помощью `update_plan`.
 3. Сохраняй найденную важную информацию в память с помощью `save_memory`.
 4. Анализируй скриншот и выбирай наиболее логичное следующее действие.
 5. Если элемент не виден, попробуй проскроллить.
@@ -195,16 +196,21 @@ class Agent:
             if content.parts:
                 for part in content.parts:
                     # Проверяем наличие данных изображения
-                    # В SDK это может быть inline_data или file_data
                     has_image = False
                     if hasattr(part, "inline_data") and part.inline_data:
                         has_image = True
                     elif hasattr(part, "file_data") and part.file_data:
                         has_image = True
                     
-                    # Если есть картинка и это НЕ последнее сообщение -> заменяем на заглушку
-                    if has_image and not is_last_message:
-                        new_parts.append(types.Part.from_text(text="[Скриншот удален для экономии контекста]"))
+                    # Проверяем наличие длинного текста (например, результат скрапинга)
+                    has_large_text = False
+                    if part.text and len(part.text) > 500:
+                        has_large_text = True
+
+                    # Если есть картинка или большой текст и это НЕ последнее сообщение -> заменяем на заглушку
+                    if (has_image or has_large_text) and not is_last_message:
+                        label = "[Скриншот удален]" if has_image else "[Текст удален для экономии контекста]"
+                        new_parts.append(types.Part.from_text(text=label))
                     else:
                         new_parts.append(part)
             

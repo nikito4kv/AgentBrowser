@@ -48,14 +48,14 @@ def test_prune_history_removes_old_screenshots():
     parts1 = pruned_history[0].parts
     assert len(parts1) == 2
     assert parts1[0].text == "Task 1"
-    assert parts1[1].text == "[Скриншот удален для экономии контекста]"
+    assert parts1[1].text == "[Скриншот удален]"
     assert getattr(parts1[1], "inline_data", None) is None
     
     # Проверяем 3-е сообщение: картинки быть не должно
     parts3 = pruned_history[2].parts
     assert len(parts3) == 2
     assert parts3[0].text == "Result 1"
-    assert parts3[1].text == "[Скриншот удален для экономии контекста]"
+    assert parts3[1].text == "[Скриншот удален]"
     
     # Проверяем 5-е сообщение (последнее): картинка должна остаться
     parts5 = pruned_history[4].parts
