@@ -9,12 +9,14 @@ class Agent:
         self.plan = []
         self.current_step = 0
         self.memory = {}
-        self.system_instruction = """
+        self.base_system_instruction = """
 Ты — AI-агент, управляющий браузером. Твоя цель — выполнять задачи пользователя, используя предоставленные инструменты.
 Тебе будет присылаться скриншот страницы с наложенными числовыми метками (лейблами) на интерактивных элементах.
 
 Доступные инструменты:
 - navigate(url: str): Переход по указанному URL. Используй это, если пользователь просит открыть конкретный сайт (например, "открой youtube.com").
+- update_plan(steps: list[str], current_step_index: int): Создать или обновить план действий. Всегда держи план актуальным.
+- save_memory(key: str, value: str): Сохранить важный факт или данные в память (например, цену, адрес, статус).
 - go_back(): Вернуться назад.
 - go_forward(): Перерейди вперед.
 - reload(): Перезагрузить страницу.
@@ -27,10 +29,31 @@ class Agent:
 
 Правила:
 1. Если пользователь дал URL или домен, используй `navigate`. Если запрос поисковый ("найди..."), используй поиск на текущей странице (Google).
-2. Анализируй скриншот и выбирай наиболее логичное следующее действие.
-3. Если элемент не виден, попробуй проскроллить.
-4. Если ты не уверен, что делать, или задача невыполнима, сообщи об этом через текстовый ответ (но старайся использовать инструменты).
-5. Всегда используй label_id из визуальных меток на скриншоте.
+2. Для сложных задач ВСЕГДА сначала создай план с помощью `update_plan`.
+3. Сохраняй найденную важную информацию в память с помощью `save_memory`.
+4. Анализируй скриншот и выбирай наиболее логичное следующее действие.
+5. Если элемент не виден, попробуй проскроллить.
+6. Если ты не уверен, что делать, или задача невыполнима, сообщи об этом через текстовый ответ (но старайся использовать инструменты).
+7. Всегда используй label_id из визуальных меток на скриншоте.
+"""
+
+    def _get_system_instruction(self):
+        plan_str = "План отсутствует."
+        if self.plan:
+            plan_str = "\n".join([f"{i}. {step} {'(ТЕКУЩИЙ)' if i == self.current_step else ''}" for i, step in enumerate(self.plan)])
+        
+        memory_str = "Память пуста."
+        if self.memory:
+            memory_str = "\n".join([f"- {k}: {v}" for k, v in self.memory.items()])
+            
+        return f"""
+{self.base_system_instruction}
+
+### ТЕКУЩИЙ ПЛАН:
+{plan_str}
+
+### ПАМЯТЬ (СОХРАНЕННЫЕ ФАКТЫ):
+{memory_str}
 """
 
     def update_plan(self, steps: list, current_step: int):
@@ -161,7 +184,7 @@ class Agent:
 
     async def think(self, contents: list):
         config = types.GenerateContentConfig(
-            system_instruction=self.system_instruction,
+            system_instruction=self._get_system_instruction(),
             tools=self.get_tools()
         )
         
