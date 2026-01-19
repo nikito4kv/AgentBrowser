@@ -70,8 +70,31 @@ class BrowserManager:
         selector = f"[data-agent-id='{label_id}']"
         element = await self.page.query_selector(selector)
         if element:
-            await element.click()
-            return True
+            try:
+                # Попытка 1: Обычный клик с коротким таймаутом
+                await element.click(timeout=2000)
+                return True
+            except Exception as e:
+                print(f"Standard click failed: {e}")
+                
+                # Если обычный клик не прошел (например, перекрытие), пробуем JS Click
+                # Это надежнее, чем force=True, так как вызывает событие напрямую на элементе
+                try:
+                    print("Attempting JS click...")
+                    await element.evaluate("el => el.click()")
+                    return True
+                except Exception as js_e:
+                    print(f"JS click failed: {js_e}")
+                    
+                    # Если и JS не помог (маловероятно), пробуем Force Click как последнюю надежду
+                    try:
+                        await element.click(force=True, timeout=2000)
+                        return True
+                    except Exception as force_e:
+                        print(f"Force click failed: {force_e}")
+                        
+        return False
+                
         return False
 
     async def type_text(self, label_id: int, text: str) -> bool:
