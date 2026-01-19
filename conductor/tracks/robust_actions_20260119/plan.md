@@ -12,13 +12,13 @@
     - [ ] Убедиться, что тест из Task 1 проходит.
 - [ ] **Task: Conductor - User Manual Verification 'Phase 1: Robust Click Implementation' (Protocol in workflow.md)**
 
-## Phase 2: Integration & Verification
+## Phase 2: Integration & Verification [checkpoint: b7250dd]
 Интеграция улучшенного клика в основной цикл и проверка на реальном примере (Google).
 
-- [ ] **Task 3: Проверка ввода текста (Robust Type)**
+- [x] **Task 3: Проверка ввода текста (Robust Type)** 8e85148
     - [ ] Проверить, нужен ли аналогичный механизм для `type_text` (иногда поле ввода тоже перекрыто).
     - [ ] Если нужно, реализовать `force` ввод.
-- [ ] **Task 4: Финальная интеграция и проверка на Google**
+- [x] **Task 4: Финальная интеграция и проверка на Google** 4c7a07c
     - [ ] Запустить сценарий поиска в Google с новым кодом.
     - [ ] Убедиться, что агент справляется автономно.
 - [ ] **Task: Conductor - User Manual Verification 'Phase 2: Integration & Verification' (Protocol in workflow.md)**
