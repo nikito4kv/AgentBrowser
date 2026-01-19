@@ -12,14 +12,14 @@
     - [ ] Написать тест, где агент должен выбрать `navigate` для запроса с URL.
 - [ ] **Task: Conductor - User Manual Verification 'Phase 1: Navigation Tools Implementation' (Protocol in workflow.md)**
 
-## Phase 2: Content Scraping Implementation
+## Phase 2: Content Scraping Implementation [checkpoint: 6fb0288]
 Реализация инструмента для чтения содержимого страницы.
 
-- [ ] **Task 3: Реализация extract_content**
+- [x] **Task 3: Реализация extract_content** 9e50ce8
     - [ ] Установить библиотеку `markdownify` (или аналог).
     - [ ] Реализовать метод `extract_content` в `BrowserManager`, который возвращает текст страницы в Markdown.
     - [ ] Написать тест: открыть страницу с текстом и проверить, что метод возвращает корректный контент.
-- [ ] **Task 4: Интеграция с Agent и Main**
+- [x] **Task 4: Интеграция с Agent и Main** 055fd60
     - [ ] Добавить инструмент `extract_content` в `Agent`.
     - [ ] Добавить обработку нового инструмента в `main.py` (`execute_tool`).
 - [ ] **Task: Conductor - User Manual Verification 'Phase 2: Content Scraping Implementation' (Protocol in workflow.md)**
