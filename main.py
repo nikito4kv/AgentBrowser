@@ -102,11 +102,33 @@ class Orchestrator:
                         text_parts = [p.text for p in candidate.content.parts if p.text]
                         if text_parts:
                             console.print(f"[yellow]Агент:[/yellow] {text_parts[0]}")
+                            # Добавляем пинок, если агент просто болтает
+                            self.history.append(
+                                types.Content(
+                                    role="user",
+                                    parts=[types.Part.from_text(text="Продолжай выполнение задачи. Используй инструменты.")]
+                                )
+                            )
+                            continue
                         else:
                             console.print("[yellow]Агент не предложил действий и не дал текстового ответа.[/yellow]")
                     else:
                         console.print("[yellow]Агент вернул пустой ответ (без частей).[/yellow]")
-                    break
+                    
+                    # Если мы здесь, значит модель тупит. Пробуем пинок.
+                    if self.recovery_attempts < 2:
+                        self.recovery_attempts += 1
+                        console.print(f"[yellow]Попытка стимуляции агента ({self.recovery_attempts}/2)...[/yellow]")
+                        self.history.append(
+                            types.Content(
+                                role="user",
+                                parts=[types.Part.from_text(text="Ты не выбрал действие. Пожалуйста, проанализируй скриншот и используй инструмент для продвижения к цели.")]
+                            )
+                        )
+                        continue
+                    else:
+                        console.print("[red]Агент застрял.[/red]")
+                        break
 
                 # Выполняем инструменты и собираем ответы
                 responses_parts = []
