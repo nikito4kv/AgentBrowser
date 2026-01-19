@@ -45,9 +45,9 @@ class BrowserManager:
         await self.page.evaluate(js_code)
         
         # Делаем скриншот
-        png_bytes = await self.page.screenshot(type="png", full_page=False)
+        png_bytes = await self.page.screenshot(type="jpeg", quality=70, full_page=False)
         
-        # Оптимизация через Pillow
+        # Оптимизация через Pillow (дополнительный ресайз если нужно)
         from PIL import Image
         import io
         
@@ -60,7 +60,11 @@ class BrowserManager:
             img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
             
         out_io = io.BytesIO()
-        img.save(out_io, format="PNG", optimize=True)
+        # Конвертируем в RGB, так как JPEG не поддерживает альфа-канал (хотя скриншот уже jpeg, но pillow при открытии может дать RGB)
+        if img.mode == 'RGBA':
+            img = img.convert('RGB')
+            
+        img.save(out_io, format="JPEG", quality=70, optimize=True)
         return out_io.getvalue()
 
     async def click_element(self, label_id: int) -> bool:

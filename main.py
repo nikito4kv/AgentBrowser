@@ -32,7 +32,7 @@ class Orchestrator:
                     role="user",
                     parts=[
                         types.Part.from_text(text=f"Задача: {user_prompt}"),
-                        types.Part.from_bytes(data=screenshot, mime_type="image/png")
+                        types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
                     ]
                 )
             )
@@ -95,10 +95,10 @@ class Orchestrator:
                         return
 
                 # После выполнения инструментов делаем новый скриншот и добавляем в историю как ответ пользователя
-                # screenshot = await self.browser.capture_annotated_screenshot()
-                # responses_parts.append(
-                #    types.Part.from_bytes(data=screenshot, mime_type="image/png")
-                # )
+                screenshot = await self.browser.capture_annotated_screenshot()
+                responses_parts.append(
+                    types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
+                )
                 
                 self.history.append(
                     types.Content(
