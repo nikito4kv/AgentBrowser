@@ -74,27 +74,20 @@ class BrowserManager:
                 # Попытка 1: Обычный клик с коротким таймаутом
                 await element.click(timeout=2000)
                 return True
-            except Exception as e:
-                print(f"Standard click failed: {e}")
-                
+            except Exception:
                 # Если обычный клик не прошел (например, перекрытие), пробуем JS Click
                 # Это надежнее, чем force=True, так как вызывает событие напрямую на элементе
                 try:
-                    print("Attempting JS click...")
                     await element.evaluate("el => el.click()")
                     return True
-                except Exception as js_e:
-                    print(f"JS click failed: {js_e}")
-                    
+                except Exception:
                     # Если и JS не помог (маловероятно), пробуем Force Click как последнюю надежду
                     try:
                         await element.click(force=True, timeout=2000)
                         return True
-                    except Exception as force_e:
-                        print(f"Force click failed: {force_e}")
+                    except Exception:
+                        pass
                         
-        return False
-                
         return False
 
     async def type_text(self, label_id: int, text: str) -> bool:
@@ -109,12 +102,9 @@ class BrowserManager:
                 await element.fill("", timeout=2000)
                 await element.type(text, timeout=2000)
                 return True
-            except Exception as e:
-                print(f"Standard type failed: {e}")
-                
+            except Exception:
                 # Попытка 2: JS ввод
                 try:
-                    print("Attempting JS type...")
                     js_code = """(el, val) => { 
                         el.value = val; 
                         el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -122,8 +112,8 @@ class BrowserManager:
                     }"""
                     await element.evaluate(js_code, text)
                     return True
-                except Exception as js_e:
-                    print(f"JS type failed: {js_e}")
+                except Exception:
+                    pass
                     
         return False
 
