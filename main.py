@@ -43,11 +43,36 @@ class Orchestrator:
                 response = await self.agent.think(self.history)
                 
                 if not response.candidates:
-                    console.print("[red]Нет ответа от модели (возможно, сработал фильтр безопасности).[/red]")
-                    if hasattr(response, 'prompt_feedback'):
-                         console.print(f"Feedback: {response.prompt_feedback}")
-                    break
+                    if not hasattr(self, 'recovery_attempts'):
+                        self.recovery_attempts = 0
                     
+                    self.recovery_attempts += 1
+                    console.print(f"[yellow]Предупреждение: Модель не дала ответа (попытка восстановления {self.recovery_attempts}/2).[/yellow]")
+                    
+                    if self.recovery_attempts <= 2:
+                        # Откатываем историю (удаляем последнее сообщение пользователя, которое привело к сбою)
+                        if self.history and self.history[-1].role == "user":
+                            self.history.pop()
+                        
+                        # Добавляем сообщение об ошибке для модели
+                        self.history.append(
+                            types.Content(
+                                role="user",
+                                parts=[
+                                    types.Part.from_text(text="Предыдущий запрос вызвал ошибку API (пустой ответ). Пожалуйста, попробуй другое действие или упрости свой следующий шаг.")
+                                ]
+                            )
+                        )
+                        continue
+                    else:
+                        console.print("[red]Критическая ошибка: Модель не дает ответа после нескольких попыток.[/red]")
+                        if hasattr(response, 'prompt_feedback'):
+                             console.print(f"Feedback: {response.prompt_feedback}")
+                        break
+                
+                # Сбрасываем счетчик при успешном ответе
+                self.recovery_attempts = 0
+                
                 candidate = response.candidates[0]
                 self.history.append(candidate.content) # Роль 'model'
                 
