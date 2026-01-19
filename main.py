@@ -55,8 +55,24 @@ class Orchestrator:
                 for call in tool_calls:
                     console.print(f"[green]Действие:[/green] {call.name}({call.args})")
                     
-                    result = await self.execute_tool(call)
+                    # Retry механизм
+                    max_retries = 3
+                    result = "Ошибка"
+                    for attempt in range(max_retries):
+                        result = await self.execute_tool(call)
+                        if "Ошибка" not in result and "Элемент не найден" not in result:
+                            break
+                        console.print(f"[yellow]Попытка {attempt+1} не удалась: {result}. Пробую снова...[/yellow]")
+                        await asyncio.sleep(2)
                     
+                    if "Ошибка" in result or "Элемент не найден" in result:
+                        console.print(f"[bold red]Критическая ошибка:[/bold red] {result}")
+                        # Здесь можно добавить input() для запроса помощи у пользователя
+                        user_help = console.input("[bold yellow]Агенту нужна помощь. Что делать? (или 'exit' для выхода): [/bold yellow]")
+                        if user_help.lower() == 'exit':
+                            return
+                        result = f"Пользователь подсказал: {user_help}"
+
                     # Передаем результат обратно в историю
                     self.history.append(
                         types.Content(
