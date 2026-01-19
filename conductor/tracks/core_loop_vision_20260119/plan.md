@@ -3,7 +3,7 @@
 ## Phase 1: Environment Setup & Browser Initialization
 Инициализация проекта, настройка зависимостей и базового управления браузером.
 
-- [ ] **Task 1: Настройка проекта с использованием `uv`**
+- [x] **Task 1: Настройка проекта с использованием `uv`** 0117a6f
     - [ ] Создать `pyproject.toml` и установить зависимости: `playwright`, `google-genai`, `pillow`, `python-dotenv`, `rich`, `pytest`, `pytest-cov`.
     - [ ] Настроить `.env` для `GEMINI_API_KEY`.
 - [ ] **Task 2: Реализация базового контроллера браузера**
