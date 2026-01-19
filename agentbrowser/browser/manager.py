@@ -142,6 +142,14 @@ class BrowserManager:
         if self.page:
             await self.page.reload()
 
+    async def extract_content(self) -> str:
+        if not self.page:
+            return ""
+        
+        html = await self.page.content()
+        from markdownify import markdownify
+        return markdownify(html, heading_style="ATX")
+
     async def close(self):
         if self.context:
             await self.context.close()
