@@ -5,7 +5,7 @@ from agentbrowser.agent.logic import Agent
 def test_agent_initialization():
     agent = Agent(api_key="test_key")
     assert agent.client is not None
-    assert agent.model_id == "gemini-2.0-flash"
+    assert agent.model_id == "gemini-2.5-pro"
 
 @pytest.mark.asyncio
 async def test_agent_think_mock():

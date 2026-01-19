@@ -1,0 +1,14 @@
+[bold blue]Задача:[/bold blue] найди самый популярный репозиторий на гитхаб и скажи сколько там звезд
+[DEBUG] Screenshot saved: debug_screenshots/run_1768841420\step_000_init.jpg
+
+--- STEP 1 ---
+[blue]Агент думает...[/blue]
+[green]Действие:[/green] update_plan({'current_step_index': 0, 'steps': ['Найти в Google "самый популярный репозиторий на гитхаб".', 'Перейти по ссылке, чтобы найти название репозитория и количество звезд.', 'Сообщить пользователю результат.']})
+Result: Plan updated
+[DEBUG] Screenshot saved: debug_screenshots/run_1768841420\step_001.jpg
+Traceback (most recent call last):
+  File "D:\Programming\AgentBrowser\verify_with_screenshots.py", line 137, in run
+    responses_parts.append(types.Part.from_text(f"Состояние страницы. Элементы:\n{elements_text}"))
+                           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Part.from_text() takes 1 positional argument but 2 were given
+[bold red]ERROR:[/bold red] Part.from_text() takes 1 positional argument but 2 were given

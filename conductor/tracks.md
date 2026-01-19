@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track: Разработка ядра автономного агента (Core Loop & Vision)
-*Link: [./conductor/tracks/core_loop_vision_20260119/](./conductor/tracks/core_loop_vision_20260119/)*
+## [~] Track: Улучшение восприятия и устойчивости (Contextual Vision & Recovery)
+*Link: [./conductor/tracks/vision_recovery_20260119/](./conductor/tracks/vision_recovery_20260119/)*
