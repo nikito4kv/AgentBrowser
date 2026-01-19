@@ -1,0 +1,26 @@
+<html>
+<head>
+    <style>
+        #target-btn {
+            position: absolute;
+            top: 50px;
+            left: 50px;
+            width: 100px;
+            height: 50px;
+        }
+        #overlay {
+            position: absolute;
+            top: 50px;
+            left: 50px;
+            width: 100px;
+            height: 50px;
+            background-color: rgba(255, 0, 0, 0.5); /* Semi-transparent red */
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <button id="target-btn" onclick="this.innerText='Clicked'">Target</button>
+    <div id="overlay"></div>
+</body>
+</html>
