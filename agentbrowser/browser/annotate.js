@@ -10,6 +10,7 @@
 
     const elements = document.querySelectorAll(interactiveSelectors.join(','));
     let count = 0;
+    const elementData = [];
 
     elements.forEach(el => {
         // Проверка видимости
@@ -18,6 +19,17 @@
         if (rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none') {
             count++;
             el.setAttribute('data-agent-id', count);
+
+            // Собираем метаданные
+            elementData.push({
+                id: count,
+                tagName: el.tagName,
+                text: el.innerText ? el.innerText.trim().substring(0, 50) : "",
+                ariaLabel: el.getAttribute('aria-label') || "",
+                placeholder: el.getAttribute('placeholder') || "",
+                title: el.getAttribute('title') || "",
+                role: el.getAttribute('role') || ""
+            });
 
             // Создаем визуальную метку
             const label = document.createElement('div');
@@ -29,13 +41,14 @@
             label.style.backgroundColor = 'red';
             label.style.color = 'white';
             label.style.fontSize = '12px';
+            label.style.fontWeight = 'bold';
             label.style.padding = '2px 5px';
             label.style.borderRadius = '3px';
             label.style.zIndex = '1000000';
-            label.style.pointerEvents = 'none'; // Чтобы метка не мешала кликам
+            label.style.pointerEvents = 'none';
 
             document.body.appendChild(label);
         }
     });
-    return count;
+    return elementData;
 })();
