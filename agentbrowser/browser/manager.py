@@ -70,6 +70,19 @@ class BrowserManager:
             return True
         return False
 
+    async def scroll(self, direction: str, amount: str = "window.innerHeight"):
+        if not self.page:
+            return
+            
+        if direction.lower() == "down":
+            await self.page.evaluate(f"window.scrollBy(0, {amount})")
+        elif direction.lower() == "up":
+            await self.page.evaluate(f"window.scrollBy(0, -{amount})")
+
+    async def wait(self, seconds: float):
+        import asyncio
+        await asyncio.sleep(seconds)
+
     async def close(self):
         if self.context:
             await self.context.close()
