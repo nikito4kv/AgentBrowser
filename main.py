@@ -89,6 +89,21 @@ class Orchestrator:
                 self.recovery_attempts = 0
                 
                 candidate = response.candidates[0]
+                if not candidate.content:
+                    console.print("[yellow]Агент вернул кандидата без контента.[/yellow]")
+                    # Тоже пробуем пинок
+                    if self.recovery_attempts < 2:
+                        self.recovery_attempts += 1
+                        self.history.append(
+                            types.Content(
+                                role="user",
+                                parts=[types.Part.from_text(text="Твой ответ был пустым. Пожалуйста, попробуй снова.")]
+                            )
+                        )
+                        continue
+                    else:
+                        break
+
                 self.history.append(candidate.content) # Роль 'model'
                 
                 # Проверяем вызовы инструментов
