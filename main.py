@@ -154,6 +154,9 @@ class Orchestrator:
             await self.browser.close()
 
     def _format_elements_data(self, elements: list[dict]) -> str:
+        if not elements:
+            return "Нет видимых интерактивных элементов."
+            
         lines = []
         for el in elements:
             info = f"ID {el['id']}: <{el['tagName']}>"

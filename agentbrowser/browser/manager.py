@@ -50,6 +50,8 @@ class BrowserManager:
                 pass
 
             elements_data = await self.page.evaluate(js_code)
+            if elements_data is None:
+                elements_data = []
         except Exception as e:
             # Если контекст умер или JS упал, возвращаем пустой список
             print(f"Annotation error: {e}")
