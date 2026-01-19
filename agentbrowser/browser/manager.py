@@ -104,9 +104,27 @@ class BrowserManager:
         selector = f"[data-agent-id='{label_id}']"
         element = await self.page.query_selector(selector)
         if element:
-            await element.fill("") # Очистка
-            await element.type(text)
-            return True
+            try:
+                # Попытка 1: Обычный ввод
+                await element.fill("", timeout=2000)
+                await element.type(text, timeout=2000)
+                return True
+            except Exception as e:
+                print(f"Standard type failed: {e}")
+                
+                # Попытка 2: JS ввод
+                try:
+                    print("Attempting JS type...")
+                    js_code = """(el, val) => { 
+                        el.value = val; 
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }"""
+                    await element.evaluate(js_code, text)
+                    return True
+                except Exception as js_e:
+                    print(f"JS type failed: {js_e}")
+                    
         return False
 
     async def scroll(self, direction: str, amount: str = "window.innerHeight"):
