@@ -119,7 +119,19 @@ class Orchestrator:
         args = call.args
         
         try:
-            if name == "click_element":
+            if name == "navigate":
+                await self.browser.navigate(args["url"])
+                return f"Перешли на {args['url']}"
+            elif name == "go_back":
+                await self.browser.go_back()
+                return "Вернулись назад"
+            elif name == "go_forward":
+                await self.browser.go_forward()
+                return "Перешли вперед"
+            elif name == "reload":
+                await self.browser.reload()
+                return "Страница перезагружена"
+            elif name == "click_element":
                 success = await self.browser.click_element(args["label_id"])
                 return "Успешно" if success else "Элемент не найден"
             elif name == "type_text":

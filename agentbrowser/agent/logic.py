@@ -11,6 +11,10 @@ class Agent:
 Тебе будет присылаться скриншот страницы с наложенными числовыми метками (лейблами) на интерактивных элементах.
 
 Доступные инструменты:
+- navigate(url: str): Переход по указанному URL. Используй это, если пользователь просит открыть конкретный сайт (например, "открой youtube.com").
+- go_back(): Вернуться назад.
+- go_forward(): Перерейди вперед.
+- reload(): Перезагрузить страницу.
 - click_element(label_id: int): Клик по элементу с указанным номером.
 - type_text(label_id: int, text: str): Ввод текста в поле.
 - scroll(direction: str): Прокрутка страницы ('up' или 'down').
@@ -18,16 +22,43 @@ class Agent:
 - task_completed(result: str): Вызывай этот инструмент, когда задача полностью выполнена. Опиши результат.
 
 Правила:
-1. Анализируй скриншот и выбирай наиболее логичное следующее действие.
-2. Если элемент не виден, попробуй проскроллить.
-3. Если ты не уверен, что делать, или задача невыполнима, сообщи об этом через текстовый ответ (но старайся использовать инструменты).
-4. Всегда используй label_id из визуальных меток на скриншоте.
+1. Если пользователь дал URL или домен, используй `navigate`. Если запрос поисковый ("найди..."), используй поиск на текущей странице (Google).
+2. Анализируй скриншот и выбирай наиболее логичное следующее действие.
+3. Если элемент не виден, попробуй проскроллить.
+4. Если ты не уверен, что делать, или задача невыполнима, сообщи об этом через текстовый ответ (но старайся использовать инструменты).
+5. Всегда используй label_id из визуальных меток на скриншоте.
 """
 
     def get_tools(self):
         return [
             types.Tool(
                 function_declarations=[
+                    types.FunctionDeclaration(
+                        name="navigate",
+                        description="Переход по указанному URL.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "url": types.Schema(type="STRING", description="Полный URL адрес (https://...).")
+                            },
+                            required=["url"]
+                        )
+                    ),
+                    types.FunctionDeclaration(
+                        name="go_back",
+                        description="Вернуться на предыдущую страницу.",
+                        parameters=types.Schema(type="OBJECT", properties={})
+                    ),
+                    types.FunctionDeclaration(
+                        name="go_forward",
+                        description="Перейти на следующую страницу (если был возврат).",
+                        parameters=types.Schema(type="OBJECT", properties={})
+                    ),
+                    types.FunctionDeclaration(
+                        name="reload",
+                        description="Перезагрузить текущую страницу.",
+                        parameters=types.Schema(type="OBJECT", properties={})
+                    ),
                     types.FunctionDeclaration(
                         name="click_element",
                         description="Клик по элементу с указанным визуальным номером ID.",
@@ -88,27 +119,13 @@ class Agent:
             )
         ]
 
-    async def think(self, user_prompt: str, image_bytes: bytes, history: list = None):
-        contents = []
-        if history:
-            contents.extend(history)
-            
-        contents.append(
-            types.Content(
-                role="user",
-                parts=[
-                    types.Part.from_text(f"Задача: {user_prompt}"),
-                    types.Part.from_bytes(data=image_bytes, mime_type="image/png")
-                ]
-            )
-        )
-        
+    async def think(self, contents: list):
         config = types.GenerateContentConfig(
             system_instruction=self.system_instruction,
             tools=self.get_tools()
         )
         
-        response = self.client.models.generate_content(
+        response = await self.client.aio.models.generate_content(
             model=self.model_id,
             contents=contents,
             config=config
