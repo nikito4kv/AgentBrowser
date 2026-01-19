@@ -11,7 +11,7 @@
     - [ ] Реализовать класс `BrowserManager` для управления сессией и навигацией.
 - [ ] **Task: Conductor - User Manual Verification 'Phase 1: Environment Setup & Browser Initialization' (Protocol in workflow.md)**
 
-## Phase 2: Visual Annotator (Set-of-Mark)
+## Phase 2: Visual Annotator (Set-of-Mark) [checkpoint: 0532e73]
 Реализация системы разметки страницы для того, чтобы ИИ мог «видеть» элементы.
 
 - [x] **Task 3: JS-скрипт для поиска и разметки элементов** 2145ba1
