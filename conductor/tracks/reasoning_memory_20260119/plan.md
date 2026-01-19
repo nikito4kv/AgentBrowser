@@ -12,13 +12,13 @@
     - [ ] Обновить `execute_tool` в `main.py` для обработки этих вызовов.
 - [ ] **Task: Conductor - User Manual Verification 'Phase 1: Logic & Tools Implementation' (Protocol in workflow.md)**
 
-## Phase 2: System Prompt & Integration
+## Phase 2: System Prompt & Integration [checkpoint: 07603f0]
 Обновление системного промпта для использования новых возможностей и интеграция в основной цикл.
 
-- [ ] **Task 3: Обновление системного промпта**
+- [x] **Task 3: Обновление системного промпта** c381581
     - [ ] Модифицировать `system_instruction` в `Agent`, чтобы он включал динамические секции "Current Plan" и "Memory".
     - [ ] Метод `think` должен подставлять актуальные значения этих секций перед отправкой.
-- [ ] **Task 4: Верификация на сложном сценарии**
+- [x] **Task 4: Верификация на сложном сценарии** c381581
     - [ ] Создать скрипт верификации, эмулирующий многошаговую задачу (или запустить вручную).
     - [ ] Убедиться, что агент создает план и следует ему.
 - [ ] **Task: Conductor - User Manual Verification 'Phase 2: System Prompt & Integration' (Protocol in workflow.md)**
