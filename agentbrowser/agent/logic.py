@@ -19,6 +19,7 @@ class Agent:
 - type_text(label_id: int, text: str): Ввод текста в поле.
 - scroll(direction: str): Прокрутка страницы ('up' или 'down').
 - wait(seconds: float): Ожидание.
+- extract_content(): Извлечение текстового контента страницы в формате Markdown. Используй это, чтобы прочитать статью или изучить содержимое страницы.
 - task_completed(result: str): Вызывай этот инструмент, когда задача полностью выполнена. Опиши результат.
 
 Правила:
@@ -103,6 +104,11 @@ class Agent:
                             },
                             required=["seconds"]
                         )
+                    ),
+                    types.FunctionDeclaration(
+                        name="extract_content",
+                        description="Извлечь текстовое содержимое текущей страницы в формате Markdown.",
+                        parameters=types.Schema(type="OBJECT", properties={})
                     ),
                     types.FunctionDeclaration(
                         name="task_completed",

@@ -143,6 +143,10 @@ class Orchestrator:
             elif name == "wait":
                 await self.browser.wait(args["seconds"])
                 return "Подождали"
+            elif name == "extract_content":
+                content = await self.browser.extract_content()
+                # Ограничим длину для истории, чтобы не перегружать контекст (но отправим всё в историю)
+                return content
             elif name == "task_completed":
                 return "Завершено"
             else:
