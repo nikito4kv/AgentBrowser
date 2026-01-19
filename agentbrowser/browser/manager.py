@@ -33,6 +33,20 @@ class BrowserManager:
         if self.page:
             await self.page.goto(url)
 
+    async def capture_annotated_screenshot(self) -> bytes:
+        if not self.page:
+            raise RuntimeError("Page not initialized. Call start() first.")
+            
+        # Инжектируем скрипт разметки
+        js_path = os.path.join(os.path.dirname(__file__), "annotate.js")
+        with open(js_path, "r", encoding="utf-8") as f:
+            js_code = f.read()
+            
+        await self.page.evaluate(js_code)
+        
+        # Делаем скриншот
+        return await self.page.screenshot(type="png", full_page=False)
+
     async def close(self):
         if self.context:
             await self.context.close()
