@@ -22,7 +22,7 @@
     - [ ] Реализовать метод в `BrowserManager` для получения скриншота с активной разметкой.
 - [ ] **Task: Conductor - User Manual Verification 'Phase 2: Visual Annotator (Set-of-Mark)' (Protocol in workflow.md)**
 
-## Phase 3: Action Layer (Basic Tools Implementation)
+## Phase 3: Action Layer (Basic Tools Implementation) [checkpoint: c850837]
 Реализация инструментов взаимодействия с браузером, которые будет вызывать ИИ.
 
 - [x] **Task 5: Реализация инструмента `click_element`** 5bb6e75
