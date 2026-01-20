@@ -45,6 +45,12 @@ class Orchestrator:
             )
             
             while True:
+                # Случайная задержка перед обдумыванием (эмуляция человеческой реакции)
+                import random
+                delay = random.uniform(1, 3)
+                console.print(f"[dim gray]Ожидание {delay:.1f} сек...[/dim gray]")
+                await asyncio.sleep(delay)
+                
                 console.print("[blue]Агент думает...[/blue]")
                 
                 try:
