@@ -1,0 +1,8 @@
+{
+  "track_id": "auth_robustness_20260120",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-01-20T15:41:00Z",
+  "updated_at": "2026-01-20T15:41:00Z",
+  "description": "Реализация механизмов авторизации через Persistent Context и повышение устойчивости агента (Stealth, Human-like behavior, Anchoring)."
+}
