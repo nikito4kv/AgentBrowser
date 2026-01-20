@@ -14,226 +14,206 @@ console = Console()
 class Orchestrator:
     def __init__(self, api_key: str):
         self.browser = BrowserManager(headless=False)
-        self.agent = Agent(api_key=api_key)
-        self.history = []
+        self.planner = Agent(api_key=api_key, role="planner")
+        self.actor = Agent(api_key=api_key, role="actor")
+        self.history = [] # Planner's history
+        self.user_prompt = ""
 
     async def run(self, user_prompt: str):
+        self.user_prompt = user_prompt
         await self.browser.start()
         try:
             console.print(f"[bold blue]Задача:[/bold blue] {user_prompt}")
             
+            # Navigate to initial page if needed or just start blank
             await self.browser.navigate("https://www.google.com")
             
-            # Первый скриншот для инициации
+            # Initial screenshot for Planner
             capture_result = await self.browser.capture_annotated_screenshot()
             if capture_result is None:
-                print("DEBUG: capture_annotated_screenshot returned None!")
                 screenshot, elements = b"", []
             else:
                 screenshot, elements = capture_result
             
             elements_text = self._format_elements_data(elements)
             
+            # Initial message to Planner
             self.history.append(
                 types.Content(
                     role="user",
                     parts=[
-                        types.Part.from_text(text=f"Задача: {user_prompt}\n\nИнтерактивные элементы на странице:\n{elements_text}"),
+                        types.Part.from_text(text=f"GOAL: {user_prompt}\n\nCurrent State:\n{elements_text}"),
                         types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
                     ]
                 )
             )
             
             while True:
-                # Случайная задержка перед обдумыванием (эмуляция человеческой реакции)
+                # Random delay for human-like behavior
                 import random
                 delay = random.uniform(1, 3)
-                console.print(f"[dim gray]Ожидание {delay:.1f} сек...[/dim gray]")
+                console.print(f"[dim gray]Waiting {delay:.1f}s...[/dim gray]")
                 await asyncio.sleep(delay)
                 
-                console.print("[blue]Агент думает...[/blue]")
+                console.print("[blue]Planner thinking...[/blue]")
                 
+                # PLANNER TURN
                 try:
-                    response = await self.agent.think(self.history)
+                    response = await self.planner.think(self.history)
                 except Exception as e:
-                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                        console.print("[yellow]Предупреждение: Лимит запросов API (429). Ждем 10 секунд перед повтором...[/yellow]")
-                        await asyncio.sleep(10)
-                        continue
-                    else:
-                        raise e
-                
+                    console.print(f"[red]Planner API Error: {e}[/red]")
+                    await asyncio.sleep(5)
+                    continue
+
                 if not response.candidates:
-                    if not hasattr(self, 'recovery_attempts'):
-                        self.recovery_attempts = 0
+                    console.print("[red]Planner returned no candidates.[/red]")
+                    continue
                     
-                    self.recovery_attempts += 1
-                    console.print(f"[yellow]Предупреждение: Модель не дала ответа (попытка восстановления {self.recovery_attempts}/2).[/yellow]")
+                planner_content = response.candidates[0].content
+                self.history.append(planner_content)
+                
+                # Print Planner's thoughts
+                if planner_content.parts:
+                    text_parts = [p.text for p in planner_content.parts if p.text]
+                    if text_parts:
+                        console.print(f"[bold cyan]Planner Thoughts:[/bold cyan]\n{text_parts[0]}")
+
+                # Check for Tool Calls
+                tool_calls = []
+                if planner_content.parts:
+                    tool_calls = [part.function_call for part in planner_content.parts if part.function_call]
+                
+                if not tool_calls:
+                    # If Planner didn't call tools, prompt it
+                    console.print("[yellow]Planner didn't call any tools. Reprompting...[/yellow]")
+                    self.history.append(
+                        types.Content(
+                            role="user",
+                            parts=[types.Part.from_text(text="Please use a tool. If you want to act, use 'delegate_to_actor'. If finished, use 'task_completed'.")]
+                        )
+                    )
+                    continue
+
+                # Execute Planner Tools
+                for call in tool_calls:
+                    console.print(f"[magenta]Planner Tool:[/magenta] {call.name}")
                     
-                    if self.recovery_attempts <= 2:
-                        # Откатываем историю (удаляем последнее сообщение пользователя, которое привело к сбою)
-                        if self.history and self.history[-1].role == "user":
-                            self.history.pop()
+                    if call.name == "task_completed":
+                        result = call.args.get('result', '')
+                        console.print(f"[bold green]TASK COMPLETED:[/bold green] {result}")
+                        return
+                    
+                    elif call.name == "task_failed":
+                        reason = call.args.get('reason', '')
+                        console.print(f"[bold red]TASK FAILED:[/bold red] {reason}")
+                        return
                         
-                        # Добавляем сообщение об ошибке для модели
+                    elif call.name == "delegate_to_actor":
+                        instruction = call.args.get('instruction', '')
+                        console.print(f"[bold yellow]Instruction for Actor:[/bold yellow] {instruction}")
+                        
+                        # ACTOR TURN
+                        actor_result = await self.run_actor_turn(instruction)
+                        
+                        # Feed result back to Planner
+                        # Capture new state after actor's action
+                        capture_result = await self.browser.capture_annotated_screenshot()
+                        if capture_result is None:
+                            new_screenshot, new_elements = b"", []
+                        else:
+                            new_screenshot, new_elements = capture_result
+                        
+                        new_elements_text = self._format_elements_data(new_elements)
+                        
                         self.history.append(
                             types.Content(
                                 role="user",
                                 parts=[
-                                    types.Part.from_text(text="Предыдущий запрос вызвал ошибку API (пустой ответ). Пожалуйста, попробуй другое действие или упрости свой следующий шаг.")
+                                    types.Part.from_function_response(
+                                        name="delegate_to_actor",
+                                        response={"result": actor_result}
+                                    ),
+                                    types.Part.from_text(text=f"Action executed. Current State:\n{new_elements_text}"),
+                                    types.Part.from_bytes(data=new_screenshot, mime_type="image/jpeg")
                                 ]
                             )
                         )
-                        continue
-                    else:
-                        console.print("[red]Критическая ошибка: Модель не дает ответа после нескольких попыток.[/red]")
-                        if hasattr(response, 'prompt_feedback'):
-                             console.print(f"Feedback: {response.prompt_feedback}")
-                        break
-                
-                # Сбрасываем счетчик при успешном ответе
-                self.recovery_attempts = 0
-                
-                candidate = response.candidates[0]
-                if not candidate.content:
-                    console.print("[yellow]Агент вернул кандидата без контента.[/yellow]")
-                    # Тоже пробуем пинок
-                    if self.recovery_attempts < 2:
-                        self.recovery_attempts += 1
-                        self.history.append(
-                            types.Content(
-                                role="user",
-                                parts=[types.Part.from_text(text="Твой ответ был пустым. Пожалуйста, попробуй снова.")]
-                            )
-                        )
-                        continue
-                    else:
-                        break
-
-                self.history.append(candidate.content) # Роль 'model'
-                
-                # Выводим мыслительный процесс (если есть)
-                if candidate.content.parts:
-                    text_parts = [p.text for p in candidate.content.parts if p.text]
-                    if text_parts:
-                        console.print(f"[bold cyan]Мысли агента:[/bold cyan]\n{text_parts[0]}")
-
-                # Проверяем вызовы инструментов
-                if candidate.content.parts:
-                    tool_calls = [part.function_call for part in candidate.content.parts if part.function_call]
-                else:
-                    tool_calls = []
-                
-                if not tool_calls:
-                    if candidate.content.parts:
-                        text_parts = [p.text for p in candidate.content.parts if p.text]
-                        if text_parts:
-                            # console.print(f"[yellow]Агент:[/yellow] {text_parts[0]}") # Уже вывели выше
-                            # Добавляем пинок, если агент просто болтает
-                            self.history.append(
-                                types.Content(
-                                    role="user",
-                                    parts=[types.Part.from_text(text="Продолжай выполнение задачи. Используй инструменты.")]
-                                )
-                            )
-                            continue
-                        else:
-                            console.print("[yellow]Агент не предложил действий и не дал текстового ответа.[/yellow]")
-                    else:
-                        console.print("[yellow]Агент вернул пустой ответ (без частей).[/yellow]")
                     
-                    # Если мы здесь, значит модель тупит. Пробуем пинок.
-                    if self.recovery_attempts < 2:
-                        self.recovery_attempts += 1
-                        console.print(f"[yellow]Попытка стимуляции агента ({self.recovery_attempts}/2)...[/yellow]")
-                        self.history.append(
-                            types.Content(
-                                role="user",
-                                parts=[types.Part.from_text(text="Ты не выбрал действие. Пожалуйста, проанализируй скриншот и используй инструмент для продвижения к цели.")]
-                            )
-                        )
-                        continue
                     else:
-                        console.print("[red]Агент застрял.[/red]")
-                        break
-
-                # Выполняем инструменты и собираем ответы
-                responses_parts = []
-                for call in tool_calls:
-                    console.print(f"[green]Действие:[/green] {call.name}({call.args})")
-                    
-                    max_retries = 3
-                    result = "Ошибка"
-                    for attempt in range(max_retries):
+                        # Handle other planner tools (update_plan, save_memory, ask_user)
                         result = await self.execute_tool(call)
-                        if "Ошибка" not in result and "Элемент не найден" not in result:
-                            break
-                        console.print(f"[yellow]Попытка {attempt+1} не удалась: {result}. Пробую снова...[/yellow]")
-                        await asyncio.sleep(2)
-                    
-                    if "Ошибка" in result or "Элемент не найден" in result:
-                        console.print(f"[bold red]Критическая ошибка:[/bold red] {result}")
-                        user_help = console.input("[bold yellow]Агенту нужна помощь. Что делать? (или 'exit' для выхода): [/bold yellow]")
-                        if user_help.lower() == 'exit':
-                            return
-                        result = f"Пользователь подсказал: {user_help}"
-
-                    responses_parts.append(
-                        types.Part.from_function_response(
-                            name=call.name,
-                            response={"result": result}
+                        self.history.append(
+                            types.Content(
+                                role="user",
+                                parts=[
+                                    types.Part.from_function_response(
+                                        name=call.name,
+                                        response={"result": str(result)}
+                                    )
+                                ]
+                            )
                         )
-                    )
-                    
-                    if call.name == "task_completed":
-                        console.print(f"[bold green]Задача завершена![/bold green] {call.args.get('result', '')}")
-                        return
-                    
-                    if call.name == "task_failed":
-                        console.print(f"[bold red]Агент сообщил о неудаче:[/bold red] {call.args.get('reason', '')}")
-                        return
-
-                # После выполнения инструментов делаем новый скриншот и добавляем в историю как ответ пользователя
-                capture_result = await self.browser.capture_annotated_screenshot()
-                if capture_result is None:
-                    print("DEBUG: capture_annotated_screenshot returned None inside loop!")
-                    new_screenshot, elements = b"", []
-                else:
-                    new_screenshot, elements = capture_result
-                
-                elements_text = self._format_elements_data(elements)
-                
-                status_msg = f"Текущее состояние страницы. Интерактивные элементы:\n{elements_text}"
-                
-                # Проверка на идентичность скриншота (Самокоррекция)
-                if hasattr(self, 'last_screenshot') and self.last_screenshot == new_screenshot:
-                    status_msg = "ВНИМАНИЕ: Скриншот не изменился после твоего последнего действия! " \
-                                "Возможно, клик не сработал или страница загружается. Попробуй другое действие.\n\n" + status_msg
-                
-                self.last_screenshot = new_screenshot
-
-                responses_parts.append(
-                    types.Part.from_text(text=status_msg)
-                )
-                responses_parts.append(
-                    types.Part.from_bytes(data=new_screenshot, mime_type="image/jpeg")
-                )
-                
-                self.history.append(
-                    types.Content(
-                        role="user",
-                        parts=responses_parts
-                    )
-                )
-                
-                await asyncio.sleep(1)
 
         except Exception as e:
             import traceback
             traceback.print_exc()
-            console.print(f"[bold red]Произошла ошибка в основном цикле:[/bold red] {str(e)}")
+            console.print(f"[bold red]Critical Error:[/bold red] {str(e)}")
         finally:
             await self.browser.close()
+
+    async def run_actor_turn(self, instruction: str) -> str:
+        console.print("[green]Actor working...[/green]")
+        
+        # Get fresh state for Actor
+        capture_result = await self.browser.capture_annotated_screenshot()
+        if capture_result is None:
+            return "Error: Could not capture screenshot for Actor."
+        screenshot, elements = capture_result
+        elements_text = self._format_elements_data(elements)
+        
+        # Construct Actor prompt
+        # We give it the specific instruction AND the global goal context
+        actor_prompt = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(
+                        text=f"GLOBAL GOAL: {self.user_prompt}\n"
+                        f"CURRENT INSTRUCTION: {instruction}\n\n"
+                        f"Interactive Elements:\n{elements_text}"
+                    ),
+                    types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
+                ]
+            )
+        ]
+        
+        try:
+            response = await self.actor.think(actor_prompt)
+        except Exception as e:
+            return f"Actor API Error: {str(e)}"
+            
+        if not response.candidates:
+            return "Actor returned no response."
+            
+        candidate = response.candidates[0]
+        tool_calls = [part.function_call for part in candidate.content.parts if part.function_call]
+        
+        if not tool_calls:
+            # Actor didn't pick a tool.
+            if candidate.content.parts:
+                text = candidate.content.parts[0].text
+                return f"Actor didn't act, but said: {text}"
+            return "Actor didn't act."
+            
+        # Execute Actor Tools
+        # Actor usually performs one atomic action per instruction
+        results = []
+        for call in tool_calls:
+            console.print(f"[green]Actor Action:[/green] {call.name}({call.args})")
+            res = await self.execute_tool(call) # Reuse common execute_tool
+            results.append(f"{call.name}: {res}")
+            
+        return "; ".join(results)
 
     def _format_elements_data(self, elements: list[dict]) -> str:
         if not elements:
@@ -252,13 +232,14 @@ class Orchestrator:
                 info += f" role='{el['role']}'"
             lines.append(info)
         
-        # Ограничиваем количество элементов в текстовом описании для экономии контекста
         if len(lines) > 50:
              lines = lines[:50] + ["...[Список элементов обрезан]..."]
              
         return "\n".join(lines) if lines else "Нет видимых интерактивных элементов."
 
     async def execute_tool(self, call):
+        # This handles tools for both Planner (non-action) and Actor (action)
+        # Note: navigate/reload are in both, but usually Actor does them.
         name = call.name
         args = call.args
         
@@ -267,10 +248,12 @@ class Orchestrator:
                 await self.browser.navigate(args["url"])
                 return f"Перешли на {args['url']}"
             elif name == "update_plan":
-                self.agent.update_plan(args["steps"], args["current_step_index"])
+                # Only Planner has this
+                self.planner.update_plan(args["steps"], args["current_step_index"])
                 return "План обновлен"
             elif name == "save_memory":
-                self.agent.save_memory(args["key"], args["value"])
+                # Planner has this
+                self.planner.save_memory(args["key"], args["value"])
                 return f"Сохранено в память: {args['key']} = {args['value']}"
             elif name == "go_back":
                 await self.browser.go_back()
@@ -298,20 +281,15 @@ class Orchestrator:
                 return "Подождали"
             elif name == "extract_content":
                 content = await self.browser.extract_content()
-                # Ограничим длину для истории, чтобы не перегружать контекст (но отправим всё в историю)
                 return content
             elif name == "ask_user":
                 question = args["question"]
                 console.print(f"[bold yellow]ВОПРОС АГЕНТА:[/bold yellow] {question}")
                 answer = console.input("[bold green]Ваш ответ: [/bold green]")
                 return f"Ответ пользователя: {answer}"
-            elif name == "task_failed":
-                return f"ЗАДАЧА ПРОВАЛЕНА: {args['reason']}"
             elif name == "get_element_details":
                 details = await self.browser.get_element_details(args["label_id"])
                 return f"Детали элемента: {details}"
-            elif name == "task_completed":
-                return "Завершено"
             else:
                 return f"Неизвестный инструмент: {name}"
         except Exception as e:
