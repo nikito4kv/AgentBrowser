@@ -1,5 +1,6 @@
 import os
 from playwright.async_api import async_playwright, BrowserContext, Page, Playwright
+from playwright_stealth import stealth_async
 
 class BrowserManager:
     def __init__(self, user_data_dir: str = "user_data_dir", headless: bool = False):
@@ -17,14 +18,20 @@ class BrowserManager:
         self.context = await self.playwright.chromium.launch_persistent_context(
             user_data_dir=absolute_user_data_dir,
             headless=self.headless,
-            args=["--disable-blink-features=AutomationControlled"], # Basic stealth
-            viewport={"width": 1280, "height": 720}
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--start-maximized"
+            ],
+            viewport=None # Используем нативный размер окна
         )
         
         if self.context.pages:
             self.page = self.context.pages[0]
         else:
             self.page = await self.context.new_page()
+            
+        # Применяем stealth к странице
+        await stealth_async(self.page)
             
         # For test compatibility, treating context as the browser instance roughly
         self.browser = self.context
