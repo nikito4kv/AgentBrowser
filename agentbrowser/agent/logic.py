@@ -1,308 +1,118 @@
 from google import genai
 from google.genai import types
 import os
+from datetime import datetime
 
 class Agent:
-    def __init__(self, api_key: str, role: str = "actor"):
+    def __init__(self, api_key: str):
         self.client = genai.Client(api_key=api_key)
-        self.role = role.lower()
-        self.plan = []
-        self.current_step = 0
+        self.model_id = "gemini-2.5-pro" 
         self.memory = {}
-        
-        # Role-based configuration
-        if self.role == "planner":
-            self.model_id = "gemini-2.5-pro" # Возвращаем Pro модель для глубокого планирования
-        elif self.role == "actor":
-            self.model_id = "gemini-2.5-flash"
-        else:
-            raise ValueError(f"Unknown role: {role}")
-
-        self.system_instruction_template = self._get_role_system_instruction()
-
-    def _get_role_system_instruction(self):
-        if self.role == "planner":
-            return """
-Ты — Planner Agent (Архитектор). Твоя задача — стратегическое управление.
-Ты НЕ кликаешь по кнопкам. Ты управляешь Actor'ом.
-
-### ГЛАВНАЯ ЦЕЛЬ (GLOBAL GOAL):
-Твоя задача — выполнить просьбу пользователя **минимальным количеством шагов**.
-
-### АЛГОРИТМ РАБОТЫ (ОБЯЗАТЕЛЬНО):
-На каждом шаге ты должен пройти этот чек-лист в мыслях:
-
-1. **АНАЛИЗ:** Что изменилось на экране? (Был поиск -> появились результаты).
-2. **ПРОВЕРКА ЦЕЛИ:** 
-   - Если цель "Найти информацию" (например, "какой заголовок?", "сколько стоит?") И эта информация видна на экране -> **ТВОЙ ХОД ЗАВЕРШЕН**. Вызывай `task_completed` с ответом. НЕ КЛИКАЙ по ссылке, если ответ уже виден.
-   - Если цель "Перейти" или "Купить" -> Ищи нужный элемент и давай инструкцию Actor'у.
-3. **ПЛАН:** Если цель не достигнута, какой следующий шаг? (Ввести текст? Нажать кнопку? Проскроллить?).
-
-### ПРАВИЛА (CRITICAL):
-1. **ПЕРВЫЙ ШАГ — ПЛАН:** В самом начале ты ОБЯЗАН вызвать инструмент `update_plan` с расписанными шагами.
-2. **ПРЯМОЙ ПЕРЕХОД:** Если в задаче есть домен (wikipedia.org, google.com) -> НЕ ИЩИ В ГУГЛЕ. Сразу дай инструкцию Actor'у: "Перейди на https://wikipedia.org".
-3. **НЕИЗМЕННАЯ ЦЕЛЬ:** Никогда не забывай исходный запрос. Если просили "хот-дог", не ищи "молоко".
-4. **ОТВЕТ СРАЗУ:** Если пользователь задал вопрос (например, "какой заголовок?") и ты видишь ответ на скриншоте — **ОСТАНОВИСЬ**. Вызывай `task_completed`.
-5. **ПОИСК И КЛАВИША ENTER:** Для поиска ВСЕГДА проси Actor'а нажать `Enter` после ввода текста.
-6. **ОЖИДАНИЕ:** Если страница пустая — используй `wait(2)`.
-
-### ФОРМАТ ВЫВОДА (В МЫСЛЯХ):
-1. **ANALYSIS:** (Состояние экрана).
-2. **PLAN CHECK:** (Какой шаг плана сейчас активен?).
-3. **DECISION:** (Что делаем?).
-
-Твои инструменты:
-- `delegate_to_actor`: Отправить команду Исполнителю.
-- `wait`: Подождать загрузки.
-- `update_plan`: Обновить список шагов.
-"""
-        elif self.role == "actor":
-            return """
-Ты — Actor Agent (Исполнитель). Твоя задача — выполнять конкретные инструкции от Planner'а.
-Ты отвечаешь за точность кликов и ввода текста.
-
-### ПРАВИЛА:
-1. **ИСПОЛНЕНИЕ:** Делай ровно то, что просит Planner.
-2. **ЦЕПОЧКА ДЕЙСТВИЙ:** Ты можешь вызвать несколько инструментов сразу (например, `type_text` и затем `press_key('Enter')`), если инструкция это подразумевает.
-3. **ТОЧНОСТЬ:** Используй правильные ID элементов из визуальных меток на скриншоте.
-
-Твои инструменты:
-- `click_element`, `type_text`, `press_key`, `scroll`, `wait`, `navigate`, `extract_content`, `get_element_details`.
-"""
-        return ""
 
     def _get_system_instruction(self):
-        # Base instruction + dynamic state
-        base = self.system_instruction_template
-        
-        plan_str = "План отсутствует."
-        if self.plan:
-            plan_str = "\n".join([f"{i}. {step} ({'ТЕКУЩИЙ' if i == self.current_step else ''})" for i, step in enumerate(self.plan)])
-        
-        memory_str = "Память пуста."
-        if self.memory:
-            memory_str = "\n".join([f"- {k}: {v}" for k, v in self.memory.items()])
-            
         return f"""
-{base}
+<SYSTEM_CAPABILITY>
+* You control a Chromium browser via Playwright automation.
+* The current date is {datetime.today().strftime("%A, %B %d, %Y")}.
+* You are an expert at navigating the web using visual inputs and DOM accessibility trees.
+</SYSTEM_CAPABILITY>
 
-### ТЕКУЩИЙ ПЛАН:
-{plan_str}
+<TOOL_GUIDANCE>
+* **browser_action**: This is your primary tool. It supports:
+  - `navigate`: Go to a URL.
+  - `left_click`, `right_click`, `double_click`: Click actions. 
+    - PREFER using `ref` (from `read_page` or `find`) for reliability.
+    - Use `coordinate` [x, y] only if `ref` is unavailable or fails.
+  - `type`: Type text. Use `ref` to target input fields.
+  - `scroll`: Scroll the page.
+  - `read_page`: **CRITICAL.** Call this to get the Accessibility Tree (text representation of the DOM) and obtain `ref_id`s (e.g., "ref_42") for elements.
+  - `find`: Use AI to find element `ref_id`s by description (e.g., "find the search button").
+  - `key`: Press keys (e.g., "Enter").
 
-### ПАМЯТЬ (СОХРАНЕННЫЕ ФАКТЫ):
-{memory_str}
+* **task_completed**: Call this when you have achieved the goal or cannot proceed.
+* **ask_user**: Call this if you need clarification or permission for sensitive actions.
+</TOOL_GUIDANCE>
+
+<WORKFLOW>
+1. **ANALYZE:** Look at the screenshot. 
+   - If you need to interact with a specific element, do you see it?
+   - If the page is blank or loading, use `wait`.
+   
+2. **LOCATE:**
+   - To interact with an element, you need its `ref_id`.
+   - **Step A:** Call `read_page` to get the DOM tree.
+   - **Step B:** Look for the element in the tree.
+   - **Step C:** If the tree is too large or you can't find it, use `browser_action(action='find', text='description')`.
+   
+3. **ACT:**
+   - Once you have the `ref_id` (e.g., "ref_12"), call `browser_action(action='left_click', ref='ref_12')`.
+   - If typing, click first (if needed) or just use `browser_action(action='type', ref='ref_12', text='hello')`.
+
+4. **VERIFY:**
+   - After an action, the browser will update. Check the new screenshot in the next turn to verify success.
+</WORKFLOW>
+
+<SAFETY_RULES>
+* Never delete data, make purchases, or send emails without explicit user confirmation via `ask_user`.
+* If you are stuck in a loop, try a different strategy (e.g., navigate by URL instead of clicking).
+</SAFETY_RULES>
 """
 
-    def update_plan(self, steps: list, current_step: int):
-        self.plan = steps
-        self.current_step = current_step
-
-    def save_memory(self, key: str, value: str):
-        self.memory[key] = value
-
     def get_tools(self):
-        # Common tools
-        common_tools = []
-        
-        # Planner Tools (High-level control)
-        planner_tools = [
+        tools = [
             types.FunctionDeclaration(
-                name="update_plan",
-                description="Создать или обновить план действий.",
+                name="browser_action",
+                description="Interact with the browser (navigate, click, type, scroll, read_page, find).",
                 parameters=types.Schema(
                     type="OBJECT",
                     properties={
-                        "steps": types.Schema(type="ARRAY", items=types.Schema(type="STRING"), description="Список шагов."),
-                        "current_step_index": types.Schema(type="INTEGER", description="Индекс текущего шага (0-based).")
+                        "action": types.Schema(
+                            type="STRING", 
+                            enum=["navigate", "left_click", "right_click", "double_click", "type", "key", "scroll", "read_page", "find", "wait"],
+                            description="The action to perform."
+                        ),
+                        "text": types.Schema(type="STRING", description="URL for navigate, text for type/find, key name for key."),
+                        "ref": types.Schema(type="STRING", description="The element reference ID (e.g., 'ref_1') obtained from read_page or find."),
+                        "coordinate": types.Schema(
+                            type="ARRAY", 
+                            items=types.Schema(type="INTEGER"), 
+                            description="[x, y] coordinates for click (fallback if ref not found)."
+                        ),
+                        "scroll_direction": types.Schema(type="STRING", enum=["up", "down", "left", "right"], description="Direction to scroll."),
+                        "scroll_amount": types.Schema(type="INTEGER", description="Pixels to scroll."),
+                        "duration": types.Schema(type="NUMBER", description="Seconds to wait.")
                     },
-                    required=["steps", "current_step_index"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="save_memory",
-                description="Сохранить важный факт или данные в память.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "key": types.Schema(type="STRING", description="Ключ для сохранения."),
-                        "value": types.Schema(type="STRING", description="Значение для сохранения.")
-                    },
-                    required=["key", "value"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="ask_user",
-                description="Спросить пользователя о чем-то или запросить подтверждение.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "question": types.Schema(type="STRING", description="Вопрос к пользователю.")
-                    },
-                    required=["question"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="task_failed",
-                description="Сообщить о невозможности выполнить задачу.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "reason": types.Schema(type="STRING", description="Причина неудачи.")
-                    },
-                    required=["reason"]
+                    required=["action"]
                 )
             ),
             types.FunctionDeclaration(
                 name="task_completed",
-                description="Завершение работы после выполнения задачи.",
+                description="Finish the task.",
                 parameters=types.Schema(
                     type="OBJECT",
                     properties={
-                        "result": types.Schema(type="STRING", description="Отчет о выполнении.")
+                        "result": types.Schema(type="STRING", description="Final result or answer.")
                     },
                     required=["result"]
                 )
             ),
             types.FunctionDeclaration(
-                name="wait",
-                description="Ожидание в течение нескольких секунд. Используй, если страница пустая или загружается.",
+                name="ask_user",
+                description="Ask the user a question.",
                 parameters=types.Schema(
                     type="OBJECT",
                     properties={
-                        "seconds": types.Schema(type="NUMBER", description="Количество секунд.")
+                        "question": types.Schema(type="STRING", description="Question to ask.")
                     },
-                    required=["seconds"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="delegate_to_actor",
-                description="Передать инструкцию Исполнителю (Actor) для выполнения действия в браузере.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "instruction": types.Schema(type="STRING", description="Четкая, пошаговая инструкция для Actor'а. Например: 'Введи текст X в поле Y' или 'Кликни на кнопку Z'.")
-                    },
-                    required=["instruction"]
+                    required=["question"]
                 )
             )
         ]
-
-        # Actor Tools (Browser Interaction)
-        actor_tools = [
-            types.FunctionDeclaration(
-                name="navigate",
-                description="Переход по указанному URL.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "url": types.Schema(type="STRING", description="Полный URL адрес (https://...)." )
-                    },
-                    required=["url"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="go_back",
-                description="Вернуться на предыдущую страницу.",
-                parameters=types.Schema(type="OBJECT", properties={})
-            ),
-            types.FunctionDeclaration(
-                name="go_forward",
-                description="Перейти на следующую страницу (если был возврат).",
-                parameters=types.Schema(type="OBJECT", properties={})
-            ),
-            types.FunctionDeclaration(
-                name="reload",
-                description="Перезагрузить текущую страницу.",
-                parameters=types.Schema(type="OBJECT", properties={})
-            ),
-            types.FunctionDeclaration(
-                name="click_element",
-                description="Клик по элементу с указанным визуальным номером ID.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "label_id": types.Schema(type="INTEGER", description="ID из визуальной метки на скриншоте.")
-                    },
-                    required=["label_id"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="type_text",
-                description="Ввод текста в поле с указанным визуальным номером ID.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "label_id": types.Schema(type="INTEGER", description="ID из визуальной метки на скриншоте."),
-                        "text": types.Schema(type="STRING", description="Текст для ввода.")
-                    },
-                    required=["label_id", "text"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="press_key",
-                description="Нажатие клавиши клавиатуры.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "key": types.Schema(type="STRING", description="Название клавиши (например, 'Enter', 'Backspace', 'Tab').")
-                    },
-                    required=["key"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="scroll",
-                description="Прокрутка страницы вверх или вниз.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "direction": types.Schema(type="STRING", enum=["up", "down"], description="Направление прокрутки.")
-                    },
-                    required=["direction"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="wait",
-                description="Ожидание в течение нескольких секунд.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "seconds": types.Schema(type="NUMBER", description="Количество секунд.")
-                    },
-                    required=["seconds"]
-                )
-            ),
-            types.FunctionDeclaration(
-                name="extract_content",
-                description="Извлечь текстовое содержимое текущей страницы в формате Markdown.",
-                parameters=types.Schema(type="OBJECT", properties={})
-            ),
-            types.FunctionDeclaration(
-                name="get_element_details",
-                description="Получить подробные атрибуты элемента (ссылку, текст, title) перед кликом.",
-                parameters=types.Schema(
-                    type="OBJECT",
-                    properties={
-                        "label_id": types.Schema(type="INTEGER", description="ID элемента.")
-                    },
-                    required=["label_id"]
-                )
-            )
-        ]
-
-        if self.role == "planner":
-            return [types.Tool(function_declarations=planner_tools)]
-        elif self.role == "actor":
-            # Actor might also need task_failed if it cannot perform action physically
-            # But let's keep it pure. Actually, let's give Actor a way to report failure.
-            # We can reuse task_failed for Actor to say "I can't click".
-            return [types.Tool(function_declarations=actor_tools + [planner_tools[-2]])] # Adding task_failed
-        
-        return []
+        return [types.Tool(function_declarations=tools)]
 
     def _prune_history(self, history: list):
         """
-        Удаляет старые скриншоты из истории, оставляя только текстовые пометки.
-        Оставляет скриншот в последнем сообщении (если он есть), чтобы агент видел текущее состояние.
+        Keeps the history clean. Retains the last screenshot, converts older ones to text placeholders.
         """
         pruned_history = []
         for i, content in enumerate(history):
@@ -311,21 +121,19 @@ class Agent:
             
             if content.parts:
                 for part in content.parts:
-                    # Проверяем наличие данных изображения
                     has_image = False
                     if hasattr(part, "inline_data") and part.inline_data:
                         has_image = True
                     elif hasattr(part, "file_data") and part.file_data:
                         has_image = True
                     
-                    # Проверяем наличие длинного текста (например, результат скрапинга)
+                    # Also prune huge text blocks (like large DOM dumps) from history if they are old
                     has_large_text = False
-                    if part.text and len(part.text) > 500:
+                    if part.text and len(part.text) > 20000:
                         has_large_text = True
 
-                    # Если есть картинка или большой текст и это НЕ последнее сообщение -> заменяем на заглушку
                     if (has_image or has_large_text) and not is_last_message:
-                        label = "[Скриншот удален]" if has_image else "[Текст удален для экономии контекста]"
+                        label = "[Image Removed]" if has_image else "[Large DOM Tree Removed]"
                         new_parts.append(types.Part.from_text(text=label))
                     else:
                         new_parts.append(part)
@@ -335,13 +143,12 @@ class Agent:
         return pruned_history
 
     async def think(self, contents: list):
-        # Очищаем историю от старых скриншотов
         pruned_contents = self._prune_history(contents)
         
         config = types.GenerateContentConfig(
             system_instruction=self._get_system_instruction(),
             tools=self.get_tools(),
-            temperature=0.0  # Делаем модель максимально детерминированной
+            temperature=0.1 
         )
         
         response = await self.client.aio.models.generate_content(

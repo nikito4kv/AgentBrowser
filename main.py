@@ -1,11 +1,22 @@
 import asyncio
 import os
 import sys
+import time
 from dotenv import load_dotenv
-from agentbrowser.browser.manager import BrowserManager
+from agentbrowser.browser.manager import BrowserManager, SecurityRiskError
 from agentbrowser.agent.logic import Agent
-from rich.console import Console
 from google.genai import types
+
+# Rich imports for UI
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
+from rich.layout import Layout
+from rich.live import Live
+from rich.markdown import Markdown
+from rich.syntax import Syntax
+from rich.table import Table
+from rich import box
 
 load_dotenv()
 
@@ -13,13 +24,10 @@ console = Console()
 
 class Orchestrator:
     def __init__(self, api_key: str):
-        self.browser = BrowserManager(headless=False)
-        self.planner = Agent(api_key=api_key, role="planner")
-        self.actor = Agent(api_key=api_key, role="actor")
-        self.history = [] # Planner's history
-        self.user_prompt = ""
+        self.browser = BrowserManager(headless=False, api_key=api_key)
+        self.agent = Agent(api_key=api_key)
+        self.history = [] 
         self.step_count = 0
-        import time
         self.debug_dir = f"debug_screenshots/run_{int(time.time())}"
         os.makedirs(self.debug_dir, exist_ok=True)
 
@@ -29,305 +37,246 @@ class Orchestrator:
         path = os.path.join(self.debug_dir, filename)
         with open(path, "wb") as f:
             f.write(screenshot_bytes)
-        # console.print(f"[dim]Saved debug image: {path}[/dim]")
 
-    async def run(self, user_prompt: str):
-        self.user_prompt = user_prompt
-        await self.browser.start()
-        try:
-            console.print(f"[bold blue]Задача:[/bold blue] {user_prompt}")
+    def print_agent_thought(self, text: str):
+        if not text.strip(): return
+        panel = Panel(
+            Markdown(text),
+            title="[bold purple]🧠 Agent Thought[/bold purple]",
+            border_style="purple",
+            box=box.ROUNDED,
+            expand=False
+        )
+        console.print(panel)
+
+    def print_tool_call(self, name: str, args: dict):
+        # Format args beautifully
+        args_str = "\n".join([f"[bold cyan]{k}[/bold cyan]: {v}" for k, v in args.items()])
+        panel = Panel(
+            args_str,
+            title=f"[bold yellow]🛠️ Tool Call: {name}[/bold yellow]",
+            border_style="yellow",
+            box=box.ROUNDED,
+            expand=False
+        )
+        console.print(panel)
+
+    def print_tool_result(self, name: str, result: str):
+        # Truncate long results for display
+        display_result = result
+        if len(result) > 500:
+            display_result = result[:500] + f"\n... [Truncated {len(result)-500} chars] ..."
             
-            # Navigate to initial page if needed or just start blank
-            await self.browser.navigate("https://www.google.com")
-            
-            # Initial screenshot for Planner
-            capture_result = await self.browser.capture_annotated_screenshot()
-            if capture_result is None:
-                screenshot, elements = b"", []
-            else:
-                screenshot, elements = capture_result
-            
+        panel = Panel(
+            Text(display_result, style="dim white"),
+            title=f"[bold green]✅ Result: {name}[/bold green]",
+            border_style="green",
+            box=box.ROUNDED,
+            expand=False
+        )
+        console.print(panel)
+
+    async def run_task(self, user_prompt: str):
+        # Ensure browser is started
+        if not self.browser.page:
+            with console.status("[bold blue]Launching Browser...[/bold blue]"):
+                await self.browser.start()
+                if not self.browser.page.url or self.browser.page.url == "about:blank":
+                    await self.browser.navigate("https://www.google.com")
+
+        console.rule(f"[bold blue]🚀 NEW GOAL[/bold blue]")
+        console.print(Panel(user_prompt, border_style="blue", box=box.DOUBLE))
+        
+        # Initial State
+        with console.status("[bold cyan]Capturing initial state...[/bold cyan]"):
+            screenshot = await self.browser.capture_screenshot()
             self.save_debug_image(screenshot, "_init")
-            elements_text = self._format_elements_data(elements)
-            
-            # Initial message to Planner
-            self.history.append(
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_text(text=f"GOAL: {user_prompt}\n\nCurrent State:\n{elements_text}"),
-                        types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
-                    ]
-                )
-            )
-            
-            while True:
-                # Random delay for human-like behavior
-                import random
-                delay = random.uniform(1, 3)
-                console.print(f"[dim gray]Waiting {delay:.1f}s...[/dim gray]")
-                await asyncio.sleep(delay)
-                
-                console.print("[blue]Planner thinking...[/blue]")
-                
-                # PLANNER TURN
-                try:
-                    response = await self.planner.think(self.history)
-                except Exception as e:
-                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                        wait_time = 15
-                        console.print(f"[yellow]Planner API Limit (429). Waiting {wait_time}s...[/yellow]")
-                        await asyncio.sleep(wait_time)
-                        continue
-                    console.print(f"[red]Planner API Error: {e}[/red]")
-                    await asyncio.sleep(5)
-                    continue
-
-                if not response.candidates:
-                    console.print("[red]Planner returned no candidates.[/red]")
-                    continue
-                    
-                planner_content = response.candidates[0].content
-                self.history.append(planner_content)
-                
-                # Print Planner's thoughts
-                if planner_content.parts:
-                    text_parts = [p.text for p in planner_content.parts if p.text]
-                    if text_parts:
-                        console.print(f"[bold cyan]Planner Thoughts:[/bold cyan]\n{text_parts[0]}")
-
-                # Check for Tool Calls
-                tool_calls = []
-                if planner_content.parts:
-                    tool_calls = [part.function_call for part in planner_content.parts if part.function_call]
-                
-                if not tool_calls:
-                    # If Planner didn't call tools, prompt it
-                    console.print("[yellow]Planner didn't call any tools. Reprompting...[/yellow]")
-                    self.history.append(
-                        types.Content(
-                            role="user",
-                            parts=[types.Part.from_text(text="Please use a tool. If you want to act, use 'delegate_to_actor'. If finished, use 'task_completed'.")]
-                        )
-                    )
-                    continue
-
-                # Execute Planner Tools
-                for call in tool_calls:
-                    console.print(f"[magenta]Planner Tool:[/magenta] {call.name}")
-                    
-                    if call.name == "task_completed":
-                        result = call.args.get('result', '')
-                        console.print(f"[bold green]TASK COMPLETED:[/bold green] {result}")
-                        return
-                    
-                    elif call.name == "task_failed":
-                        reason = call.args.get('reason', '')
-                        console.print(f"[bold red]TASK FAILED:[/bold red] {reason}")
-                        return
-                        
-                    elif call.name == "delegate_to_actor":
-                        instruction = call.args.get('instruction', '')
-                        console.print(f"[bold yellow]Instruction for Actor:[/bold yellow] {instruction}")
-                        
-                        # ACTOR TURN
-                        actor_result = await self.run_actor_turn(instruction)
-                        
-                        # Feed result back to Planner
-                        # Capture new state after actor's action
-                        self.step_count += 1
-                        capture_result = await self.browser.capture_annotated_screenshot()
-                        if capture_result is None:
-                            new_screenshot, new_elements = b"", []
-                        else:
-                            new_screenshot, new_elements = capture_result
-                        
-                        self.save_debug_image(new_screenshot)
-                        new_elements_text = self._format_elements_data(new_elements)
-                        
-                        self.history.append(
-                            types.Content(
-                                role="user",
-                                parts=[
-                                    types.Part.from_function_response(
-                                        name="delegate_to_actor",
-                                        response={"result": actor_result}
-                                    ),
-                                    types.Part.from_text(text=f"Action executed. Current State:\n{new_elements_text}"),
-                                    types.Part.from_bytes(data=new_screenshot, mime_type="image/jpeg")
-                                ]
-                            )
-                        )
-                    
-                    else:
-                        # Handle other planner tools (update_plan, save_memory, ask_user)
-                        result = await self.execute_tool(call)
-                        self.history.append(
-                            types.Content(
-                                role="user",
-                                parts=[
-                                    types.Part.from_function_response(
-                                        name=call.name,
-                                        response={"result": str(result)}
-                                    )
-                                ]
-                            )
-                        )
-
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            console.print(f"[bold red]Critical Error:[/bold red] {str(e)}")
-        finally:
-            await self.browser.close()
-
-    async def run_actor_turn(self, instruction: str) -> str:
-        console.print("[green]Actor working...[/green]")
         
-        # Get fresh state for Actor
-        capture_result = await self.browser.capture_annotated_screenshot()
-        if capture_result is None:
-            return "Error: Could not capture screenshot for Actor."
-        screenshot, elements = capture_result
-        elements_text = self._format_elements_data(elements)
-        
-        # Construct Actor prompt
-        # We give it the specific instruction AND the global goal context
-        actor_prompt = [
+        # Initialize History
+        self.history = [
             types.Content(
                 role="user",
                 parts=[
-                    types.Part.from_text(
-                        text=f"GLOBAL GOAL: {self.user_prompt}\n"
-                        f"CURRENT INSTRUCTION: {instruction}\n\n"
-                        f"Interactive Elements:\n{elements_text}"
-                    ),
+                    types.Part.from_text(text=f"GOAL: {user_prompt}"),
                     types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
                 ]
             )
         ]
         
-        try:
-            response = await self.actor.think(actor_prompt)
-        except Exception as e:
-            return f"Actor API Error: {str(e)}"
+        while True:
+            await asyncio.sleep(0.5) 
             
-        if not response.candidates:
-            return "Actor returned no response."
-            
-        candidate = response.candidates[0]
-        tool_calls = [part.function_call for part in candidate.content.parts if part.function_call]
-        
-        if not tool_calls:
-            # Actor didn't pick a tool.
-            if candidate.content.parts:
-                text = candidate.content.parts[0].text
-                return f"Actor didn't act, but said: {text}"
-            return "Actor didn't act."
-            
-        # Execute Actor Tools
-        # Actor usually performs one atomic action per instruction
-        results = []
-        for call in tool_calls:
-            console.print(f"[green]Actor Action:[/green] {call.name}({call.args})")
-            res = await self.execute_tool(call) # Reuse common execute_tool
-            results.append(f"{call.name}: {res}")
-            
-        return "; ".join(results)
+            # THINKING PHASE
+            with console.status("[bold purple]Agent is thinking...[/bold purple]", spinner="dots"):
+                try:
+                    response = await self.agent.think(self.history)
+                except Exception as e:
+                    console.print(f"[bold red]💥 API Error:[/bold red] {e}")
+                    await asyncio.sleep(5)
+                    continue
 
-    def _format_elements_data(self, elements: list[dict]) -> str:
-        if not elements:
-            return "Нет видимых интерактивных элементов."
+            if not response.candidates:
+                console.print("[bold red]❌ Agent returned no content.[/bold red]")
+                continue
             
-        lines = []
-        for el in elements:
-            info = f"ID {el['id']}: <{el['tagName']}>"
-            if el['text']:
-                info += f" '{el['text']}'"
-            if el['ariaLabel']:
-                info += f" aria-label='{el['ariaLabel']}'"
-            if el['placeholder']:
-                info += f" placeholder='{el['placeholder']}'"
-            if el['role']:
-                info += f" role='{el['role']}'"
-            lines.append(info)
-        
-        if len(lines) > 50:
-             lines = lines[:50] + ["...[Список элементов обрезан]..."]
-             
-        return "\n".join(lines) if lines else "Нет видимых интерактивных элементов."
+            candidate = response.candidates[0]
+            if not candidate.content:
+                 console.print(f"[bold red]❌ Empty response. Reason: {candidate.finish_reason}[/bold red]")
+                 self.history.append(
+                     types.Content(role="user", parts=[types.Part.from_text(text="Empty response. Please try again.")])
+                 )
+                 continue
 
-    async def execute_tool(self, call):
-        # This handles tools for both Planner (non-action) and Actor (action)
-        # Note: navigate/reload are in both, but usually Actor does them.
-        name = call.name
-        args = call.args
-        
-        try:
-            if name == "navigate":
-                await self.browser.navigate(args["url"])
-                return f"Перешли на {args['url']}"
-            elif name == "update_plan":
-                # Only Planner has this
-                self.planner.update_plan(args["steps"], args["current_step_index"])
-                return "План обновлен"
-            elif name == "save_memory":
-                # Planner has this
-                self.planner.save_memory(args["key"], args["value"])
-                return f"Сохранено в память: {args['key']} = {args['value']}"
-            elif name == "go_back":
-                await self.browser.go_back()
-                return "Вернулись назад"
-            elif name == "go_forward":
-                await self.browser.go_forward()
-                return "Перешли вперед"
-            elif name == "reload":
-                await self.browser.reload()
-                return "Страница перезагружена"
-            elif name == "click_element":
-                success = await self.browser.click_element(args["label_id"])
-                return "Успешно" if success else "Элемент не найден"
-            elif name == "type_text":
-                success = await self.browser.type_text(args["label_id"], args["text"])
-                return "Успешно" if success else "Элемент не найден"
-            elif name == "press_key":
-                success = await self.browser.press_key(args["key"])
-                return f"Нажата клавиша {args['key']}" if success else "Ошибка нажатия"
-            elif name == "scroll":
-                await self.browser.scroll(args["direction"])
-                return "Прокручено"
-            elif name == "wait":
-                await self.browser.wait(args["seconds"])
-                return "Подождали"
-            elif name == "extract_content":
-                content = await self.browser.extract_content()
-                return content
-            elif name == "ask_user":
-                question = args["question"]
-                console.print(f"[bold yellow]ВОПРОС АГЕНТА:[/bold yellow] {question}")
-                answer = console.input("[bold green]Ваш ответ: [/bold green]")
-                return f"Ответ пользователя: {answer}"
-            elif name == "get_element_details":
-                details = await self.browser.get_element_details(args["label_id"])
-                return f"Детали элемента: {details}"
-            else:
-                return f"Неизвестный инструмент: {name}"
-        except Exception as e:
-            return f"Ошибка при выполнении: {str(e)}"
+            agent_content = candidate.content
+            self.history.append(agent_content)
+            
+            # 1. DISPLAY THOUGHTS
+            thoughts = []
+            if agent_content.parts:
+                for p in agent_content.parts:
+                    if p.text:
+                        thoughts.append(p.text)
+            
+            if thoughts:
+                self.print_agent_thought("\n".join(thoughts))
+
+            # 2. PARSE TOOLS
+            parts = agent_content.parts or []
+            tool_calls = [part.function_call for part in parts if part.function_call]
+            
+            if not tool_calls:
+                console.print("[yellow]⚠️ No tools called. Nudging agent...[/yellow]")
+                self.history.append(
+                    types.Content(
+                        role="user", 
+                        parts=[types.Part.from_text(text="Please take an action using 'browser_action' or 'task_completed'.")]
+                    )
+                )
+                continue
+
+            # 3. EXECUTE TOOLS
+            task_done = False
+            for call in tool_calls:
+                args_dict = {k: v for k, v in call.args.items()}
+                self.print_tool_call(call.name, args_dict)
+                
+                result_text = ""
+                
+                # Special handling for tools that require user interaction
+                if call.name == "task_completed":
+                    result = args_dict.get('result', '')
+                    result_text = f"Task Completed: {result}"
+                    task_done = True
+                    console.print()
+                    console.print(Panel(result, title="[bold green]🎉 MISSION ACCOMPLISHED[/bold green]", border_style="bright_green", box=box.HEAVY))
+                
+                elif call.name == "ask_user":
+                    # ASK USER - NO SPINNER
+                    question = args_dict.get('question', '')
+                    console.print(Panel(f"[bold yellow]❓ Agent Question:[/bold yellow] {question}", border_style="yellow"))
+                    answer = console.input("[bold green]Your Answer > [/bold green]")
+                    result_text = f"User Answer: {answer}"
+                
+                elif call.name == "browser_action":
+                    # BROWSER ACTION - WITH SPINNER
+                    try:
+                        with console.status(f"[bold yellow]Executing {call.name}...[/bold yellow]", spinner="clock"):
+                            result_text = await self.browser.execute_action(**args_dict)
+                    except SecurityRiskError as e:
+                        # SECURITY INTERCEPT - NO SPINNER
+                        console.print(Panel(
+                            f"[bold red]SECURITY ALERT:[/bold red] {str(e)}\n"
+                            f"[yellow]Details:[/yellow] {e.risk_details}",
+                            title="🛡️ SECURITY INTERCEPT",
+                            border_style="red",
+                            box=box.HEAVY
+                        ))
+                        answer = console.input("[bold red]Allow this action? (y/n) > [/bold red]")
+                        if answer.lower() == 'y':
+                            console.print("[green]Action Authorized. Proceeding...[/green]")
+                            with console.status("[bold yellow]Executing (Forced)...[/bold yellow]", spinner="clock"):
+                                result_text = await self.browser.execute_action(force=True, **args_dict)
+                        else:
+                            result_text = "Action blocked by user security policy."
+                            console.print("[red]Action Blocked.[/red]")
+                
+                else:
+                    # Generic tools
+                    with console.status(f"[bold yellow]Executing {call.name}...[/bold yellow]", spinner="clock"):
+                        result_text = f"Unknown tool: {call.name}"
+
+                if not task_done:
+                    self.print_tool_result(call.name, result_text)
+
+                # 4. CAPTURE NEW STATE
+                self.step_count += 1
+                with console.status("[dim cyan]Updating visuals...[/dim cyan]", spinner="simpleDots"):
+                    await asyncio.sleep(1.0) # Wait for UI
+                    new_screenshot = await self.browser.capture_screenshot()
+                    self.save_debug_image(new_screenshot)
+                
+                # Update History
+                self.history.append(
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part.from_function_response(
+                                name=call.name,
+                                response={"result": result_text}
+                            ),
+                            types.Part.from_bytes(data=new_screenshot, mime_type="image/jpeg")
+                        ]
+                    )
+                )
+
+                if task_done:
+                    break
+            
+            if task_done:
+                break
+
+    async def close(self):
+        with console.status("[bold red]Shutting down...[/bold red]"):
+            await self.browser.close()
 
 async def main():
-    if len(sys.argv) < 2:
-        console.print("[red]Укажите задачу в кавычках.[/red]")
-        return
-        
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        console.print("[red]GEMINI_API_KEY не найден в .env[/red]")
+        console.print("[bold red]❌ GEMINI_API_KEY missing in .env[/bold red]")
         return
-        
-    prompt = sys.argv[1]
+    
     orchestrator = Orchestrator(api_key)
-    await orchestrator.run(prompt)
+    
+    console.clear()
+    console.print(Panel.fit(
+        "[bold white]AgentBrowser[/bold white] [cyan]v2.0[/cyan]\n[dim]Powered by Gemini 2.5 Pro & Flash[/dim]",
+        border_style="cyan",
+        box=box.DOUBLE
+    ))
+
+    try:
+        await orchestrator.browser.start()
+        
+        while True:
+            try:
+                console.print()
+                user_input = console.input("[bold blue]🤖 Command > [/bold blue]")
+                if not user_input.strip(): continue
+                
+                if user_input.lower() in ['exit', 'quit']:
+                    break
+                
+                await orchestrator.run_task(user_input)
+                
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Interrupted.[/yellow]")
+                continue
+            except Exception as e:
+                console.print(f"[bold red]Fatal Error:[/bold red] {e}")
+                import traceback
+                traceback.print_exc()
+    finally:
+        await orchestrator.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
