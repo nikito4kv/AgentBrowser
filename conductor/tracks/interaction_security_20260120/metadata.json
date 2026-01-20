@@ -1,0 +1,8 @@
+{
+  "id": "interaction_security_20260120",
+  "name": "Interaction & Security",
+  "description": "Implementation of user interaction tools (ask_user), explicit failure handling (task_failed), and security layers for safe execution.",
+  "status": "active",
+  "created_at": "2026-01-20",
+  "priority": "high"
+}
