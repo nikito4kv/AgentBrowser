@@ -18,6 +18,18 @@ class Orchestrator:
         self.actor = Agent(api_key=api_key, role="actor")
         self.history = [] # Planner's history
         self.user_prompt = ""
+        self.step_count = 0
+        import time
+        self.debug_dir = f"debug_screenshots/run_{int(time.time())}"
+        os.makedirs(self.debug_dir, exist_ok=True)
+
+    def save_debug_image(self, screenshot_bytes, suffix=""):
+        if not screenshot_bytes: return
+        filename = f"step_{self.step_count:03d}{suffix}.jpg"
+        path = os.path.join(self.debug_dir, filename)
+        with open(path, "wb") as f:
+            f.write(screenshot_bytes)
+        # console.print(f"[dim]Saved debug image: {path}[/dim]")
 
     async def run(self, user_prompt: str):
         self.user_prompt = user_prompt
@@ -35,6 +47,7 @@ class Orchestrator:
             else:
                 screenshot, elements = capture_result
             
+            self.save_debug_image(screenshot, "_init")
             elements_text = self._format_elements_data(elements)
             
             # Initial message to Planner
@@ -61,6 +74,11 @@ class Orchestrator:
                 try:
                     response = await self.planner.think(self.history)
                 except Exception as e:
+                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                        wait_time = 15
+                        console.print(f"[yellow]Planner API Limit (429). Waiting {wait_time}s...[/yellow]")
+                        await asyncio.sleep(wait_time)
+                        continue
                     console.print(f"[red]Planner API Error: {e}[/red]")
                     await asyncio.sleep(5)
                     continue
@@ -117,12 +135,14 @@ class Orchestrator:
                         
                         # Feed result back to Planner
                         # Capture new state after actor's action
+                        self.step_count += 1
                         capture_result = await self.browser.capture_annotated_screenshot()
                         if capture_result is None:
                             new_screenshot, new_elements = b"", []
                         else:
                             new_screenshot, new_elements = capture_result
                         
+                        self.save_debug_image(new_screenshot)
                         new_elements_text = self._format_elements_data(new_elements)
                         
                         self.history.append(
