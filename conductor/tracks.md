@@ -14,5 +14,9 @@ This file tracks all major tracks for the project. Each track has its own detail
 *Link: [./conductor/tracks/interaction_security_20260120/](./conductor/tracks/interaction_security_20260120/)*
 *Goal: Внедрение диалога с пользователем (ask_user), безопасного выполнения (Security Layer) и обработки неудач (task_failed).*
 
-## [x] Track: Авторизация и Устойчивость (Authentication & Robustness)
+## [ ] Track: Авторизация и Устойчивость (Authentication & Robustness)
 *Link: [./conductor/archive/auth_robustness_20260120/](./conductor/archive/auth_robustness_20260120/)*
+
+## [ ] Track: Продвинутые рассуждения (Planner-Actor)
+*Link: [./conductor/tracks/planner_actor_20260120/](./conductor/tracks/planner_actor_20260120/)*
+*Goal: Внедрение архитектуры двух моделей (Planner-Actor) с использованием Gemini 2.5 Pro/Flash для решения проблемы потери контекста.*
