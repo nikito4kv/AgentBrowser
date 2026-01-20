@@ -182,6 +182,10 @@ class Orchestrator:
                     if call.name == "task_completed":
                         console.print(f"[bold green]Задача завершена![/bold green] {call.args.get('result', '')}")
                         return
+                    
+                    if call.name == "task_failed":
+                        console.print(f"[bold red]Агент сообщил о неудаче:[/bold red] {call.args.get('reason', '')}")
+                        return
 
                 # После выполнения инструментов делаем новый скриншот и добавляем в историю как ответ пользователя
                 capture_result = await self.browser.capture_annotated_screenshot()
@@ -290,6 +294,16 @@ class Orchestrator:
                 content = await self.browser.extract_content()
                 # Ограничим длину для истории, чтобы не перегружать контекст (но отправим всё в историю)
                 return content
+            elif name == "ask_user":
+                question = args["question"]
+                console.print(f"[bold yellow]ВОПРОС АГЕНТА:[/bold yellow] {question}")
+                answer = console.input("[bold green]Ваш ответ: [/bold green]")
+                return f"Ответ пользователя: {answer}"
+            elif name == "task_failed":
+                return f"ЗАДАЧА ПРОВАЛЕНА: {args['reason']}"
+            elif name == "get_element_details":
+                details = await self.browser.get_element_details(args["label_id"])
+                return f"Детали элемента: {details}"
             elif name == "task_completed":
                 return "Завершено"
             else:

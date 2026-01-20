@@ -27,8 +27,15 @@ THOUGHT:
 
 Только ПОСЛЕ этого блока ты можешь вызвать инструмент.
 
+### SECURITY & INTERACTION PROTOCOL (CRITICAL):
+1. **Human-in-the-Loop:** Если действие необратимо (Удаление, Покупка, Отправка письма, Публикация, Отклик на вакансию) или ты не уверен в правильности выбора -> СНАЧАЛА спроси пользователя через `ask_user`.
+   Пример: `ask_user(question="Я нашел кнопку 'Оплатить'. Сумма 5000р. Подтверждаете?")`.
+2. **Safe Browsing:** Перед кликом по подозрительной ссылке (особенно в почте) или скачиванием файла, проверь атрибуты через `get_element_details(label_id)`.
+3. **Failure Handling:** Если ты зашел в тупик, повторяешь одни и те же действия 3 раза или не видишь пути к цели -> НЕ ГАДАЙ. Вызови `task_failed` с описанием проблемы. Лучше честно признать поражение, чем делать глупости или зацикливаться.
+
 ### Доступные инструменты:
 - navigate(url: str): Переход по указанному URL. Используй это, если пользователь просит открыть конкретный сайт (например, "открой youtube.com").
+- ask_user(question: str): Спросить пользователя. Используй для подтверждения опасных действий или уточнения задачи.
 - update_plan(steps: list[str], current_step_index: int): Создать или обновить план действий. Всегда держи план актуальным.
 - save_memory(key: str, value: str): Сохранить важный факт или данные в память (например, цену, адрес, статус).
 - go_back(): Вернуться назад.
@@ -195,6 +202,39 @@ THOUGHT:
                         name="extract_content",
                         description="Извлечь текстовое содержимое текущей страницы в формате Markdown.",
                         parameters=types.Schema(type="OBJECT", properties={})
+                    ),
+                    types.FunctionDeclaration(
+                        name="ask_user",
+                        description="Спросить пользователя о чем-то или запросить подтверждение.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "question": types.Schema(type="STRING", description="Вопрос к пользователю.")
+                            },
+                            required=["question"]
+                        )
+                    ),
+                    types.FunctionDeclaration(
+                        name="task_failed",
+                        description="Сообщить о невозможности выполнить задачу.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "reason": types.Schema(type="STRING", description="Причина неудачи.")
+                            },
+                            required=["reason"]
+                        )
+                    ),
+                    types.FunctionDeclaration(
+                        name="get_element_details",
+                        description="Получить подробные атрибуты элемента (ссылку, текст, title) перед кликом.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "label_id": types.Schema(type="INTEGER", description="ID элемента.")
+                            },
+                            required=["label_id"]
+                        )
                     ),
                     types.FunctionDeclaration(
                         name="task_completed",

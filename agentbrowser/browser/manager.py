@@ -240,6 +240,32 @@ class BrowserManager:
             
         return md.strip()
 
+    async def get_element_details(self, label_id: int) -> dict:
+        if not self.page:
+            return {}
+            
+        selector = f"[data-agent-id='{label_id}']"
+        element = await self.page.query_selector(selector)
+        if not element:
+            return {"error": "Element not found"}
+            
+        try:
+            details = await element.evaluate("""el => {
+                return {
+                    tagName: el.tagName.toLowerCase(),
+                    href: el.href || el.getAttribute('href') || '',
+                    title: el.title || el.getAttribute('title') || '',
+                    alt: el.alt || el.getAttribute('alt') || '',
+                    innerText: el.innerText ? el.innerText.substring(0, 200) : '',
+                    value: el.value || '',
+                    type: el.type || '',
+                    ariaLabel: el.getAttribute('aria-label') || ''
+                }
+            }""")
+            return details
+        except Exception as e:
+            return {"error": str(e)}
+
     async def close(self):
         if self.context:
             await self.context.close()
