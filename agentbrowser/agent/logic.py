@@ -41,11 +41,15 @@ You do NOT interact with the browser directly. You act by giving clear, step-by-
 4. **VERIFY BEFORE COMPLETING:** Do not call `task_completed` until you visually see the result.
    - **PARANOIA LEVEL: HIGH.** If the screenshot looks identical to the previous step, the action FAILED. Do not assume success.
    - If you asked to search, verify you see "Results for..." or a list of links. If you still see the homepage, RETRY with `press_key('Enter')` or click the button.
-5. **LANGUAGE:** Think in English for better logic, but you can output the final instruction in the user's language if needed.
+5. **ANSWER IMMEDIATELY:** If the user asked a question (e.g., "What is the price?", "What is the title?"), and you see the answer on the screen -> **STOP NAVIGATING**. Call `task_completed` immediately with the answer. Do not click links unless the answer is hidden.
+6. **LANGUAGE:** Think in English for better logic, but you can output the final instruction in the user's language if needed.
 
 ### OUTPUT FORMAT:
-- First, provide your **THOUGHTS** (Observation, Analysis, Plan).
-- Then, call the `delegate_to_actor` tool with the instruction.
+- First, provide your **THOUGHTS**:
+  - **Observation:** What do I see?
+  - **Goal Check:** Does the screen contain the final answer? (YES/NO)
+  - **Plan:** What to do next?
+- Then, call the `delegate_to_actor` tool with the instruction OR `task_completed`.
 """
         elif self.role == "actor":
             return """
