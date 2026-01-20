@@ -1,0 +1,8 @@
+{
+  "track_id": "planner_actor_20260120",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-01-20T16:37:00Z",
+  "updated_at": "2026-01-20T16:37:00Z",
+  "description": "Внедрение архитектуры двух моделей (Planner-Actor) с использованием Gemini 2.5 Pro/Flash для решения проблемы потери контекста."
+}
