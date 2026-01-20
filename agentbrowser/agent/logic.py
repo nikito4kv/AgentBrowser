@@ -12,7 +12,7 @@ class Agent:
         
         # Role-based configuration
         if self.role == "planner":
-            self.model_id = "gemini-2.0-flash" # Используем быструю и точную модель для планирования
+            self.model_id = "gemini-2.5-pro" # Возвращаем Pro модель для глубокого планирования
         elif self.role == "actor":
             self.model_id = "gemini-2.5-flash"
         else:
@@ -48,10 +48,12 @@ class Agent:
 - NEXT ACTION: (Что делаем сейчас?)
 - REASON: (Почему?)
 
+6. **ОЖИДАНИЕ:** Если страница пустая ("Нет видимых элементов") или явно загружается — используй инструмент `wait(2)`. Не выдумывай действия.
+
 Твои инструменты:
-- `delegate_to_actor`: Дать команду "рукам".
-- `task_completed`: Завершить задачу и дать ответ пользователю.
-- `task_failed`: Сдаться.
+- `delegate_to_actor`: Отправить команду Исполнителю.
+- `wait`: Подождать загрузки.
+- `update_plan`: Обновить список шагов.
 """
         elif self.role == "actor":
             return """
@@ -158,6 +160,17 @@ class Agent:
                         "result": types.Schema(type="STRING", description="Отчет о выполнении.")
                     },
                     required=["result"]
+                )
+            ),
+            types.FunctionDeclaration(
+                name="wait",
+                description="Ожидание в течение нескольких секунд. Используй, если страница пустая или загружается.",
+                parameters=types.Schema(
+                    type="OBJECT",
+                    properties={
+                        "seconds": types.Schema(type="NUMBER", description="Количество секунд.")
+                    },
+                    required=["seconds"]
                 )
             ),
             types.FunctionDeclaration(
