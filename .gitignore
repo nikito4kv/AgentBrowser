@@ -3,3 +3,5 @@
 __pycache__/
 *.pyc
 user_data_dir/
+agent_debug.log
+debug_screenshots/

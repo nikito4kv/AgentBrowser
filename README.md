@@ -28,62 +28,107 @@ A powerful, autonomous browser automation agent powered by Google's Gemini 2.5 P
 └── .env                   # Environment variables (API Key)
 ```
 
-## Quick Start
+## Detailed Installation & Setup Guide
 
-### Prerequisites
+### 1. Prerequisites
 
-- Python 3.10+
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
-- Google Gemini API Key
+- **Python 3.10** or higher.
+- **Google Gemini API Key**: You can get one from [Google AI Studio](https://aistudio.google.com/).
+- **Git**: To clone the repository.
 
-### Setup
+### 2. Clone the Repository
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/nikito4kv/ai-browser-use.git
-   cd AgentBrowser
-   ```
+Open your terminal or command prompt and run:
 
-2. **Install dependencies**:
-   ```bash
-   uv sync
-   # or
-   pip install -e .
-   ```
+```bash
+git clone https://github.com/nikito4kv/ai-browser-use.git
+cd AgentBrowser
+```
 
-3. **Configure environment**:
-   Create a `.env` file in the root directory:
-   ```env
-   GEMINI_API_KEY=your_api_key_here
-   ```
+### 3. Install Dependencies
 
-### Running the Agent
+We recommend using [uv](https://github.com/astral-sh/uv) for fast package management, but standard `pip` works too.
+
+**Option A: Using `uv` (Recommended)**
+```bash
+# If you don't have uv installed:
+pip install uv
+
+# Sync dependencies
+uv sync
+```
+
+**Option B: Using `pip`**
+```bash
+pip install -e .
+```
+
+### 4. Install Playwright Browsers
+
+The agent controls a Chromium browser which must be installed:
+
+```bash
+playwright install chromium
+```
+
+### 5. Configure API Key
+
+Create a file named `.env` in the root directory of the project (`AgentBrowser/`).
+Open it with a text editor and add your key:
+
+```env
+GEMINI_API_KEY=your_actual_api_key_here
+```
+
+---
+
+## How to Run & Use
+
+### Starting the Agent
+
+To start the interactive CLI:
 
 ```bash
 python main.py
 ```
 
-## Usage Examples
+### Headed Mode & Logging In (IMPORTANT)
 
-Once running, try commands like:
-- "Navigate to news.ycombinator.com and give me a summary of the top 3 stories."
-- "Go to Google, search for 'latest AI news', and tell me what's trending."
-- "Find the login button on github.com and describe the page structure."
-- "Check my email on Gmail (requires login in the browser)."
+By default, the agent runs in **Headed Mode** (the browser window is visible). This is a feature, not a bug!
+
+**How to log in to your accounts (Gmail, LinkedIn, GitHub, etc.):**
+
+1.  **Run the agent**: `python main.py`
+2.  The browser window will open automatically.
+3.  **IGNORE the agent for a moment.** Go to the browser window yourself.
+4.  Navigate to the site you want (e.g., `gmail.com`).
+5.  **Log in manually** with your username and password.
+6.  Once logged in, you can close the tab or just switch back to the terminal.
+7.  **The session is saved!** The agent uses a persistent user profile (stored in the `user_data_dir` folder).
+8.  Now you can ask the agent: *"Check my latest emails"* or *"Go to GitHub and star the AgentBrowser repo"*, and it will already be logged in.
+
+### Usage Examples
+
+In the CLI prompt `🤖 Command >`, try these:
+
+- **Research**: "Navigate to news.ycombinator.com and give me a summary of the top 3 stories."
+- **Search**: "Go to Google, search for 'latest AI news', and tell me what's trending."
+- **Analysis**: "Find the login button on github.com and describe the page structure."
+- **Personal**: "Check my unread emails on Gmail." (Requires manual login first, see above).
 
 ## Security & Safety
 
 AgentBrowser includes a **Security Middleware** designed to prevent accidental data loss or unauthorized transactions.
 
-1. **Keyword Detection**: The agent scans element text for risky keywords (Delete, Buy, Pay, Send, etc.).
-2. **Human-in-the-Loop**: If a risky action is detected, the CLI will intercept the command, display a **SECURITY ALERT**, and wait for your explicit `y/n` confirmation.
-3. **Sandboxed Browser**: Uses Playwright's persistent context for isolated browsing sessions.
+1.  **Keyword Detection**: The agent scans element text for risky keywords (Delete, Buy, Pay, Send, etc.).
+2.  **Human-in-the-Loop**: If a risky action is detected, the CLI will intercept the command, display a **SECURITY ALERT**, and wait for your explicit `y/n` confirmation.
+3.  **Sandboxed Browser**: Uses Playwright's persistent context for isolated browsing sessions.
 
-## Architecture Highlights
+## Troubleshooting
 
-**Element Targeting**: Instead of guessing pixels, the agent calls `read_page` to get a YAML-like tree of the DOM. Each element gets a unique `ref_id`. The agent then says "Click ref_42", and our JS engine finds the exact coordinates for the click.
-
-**Timing & Stability**: We use `networkidle` states and trice-click strategies to ensure focus and stability, especially on complex Single Page Applications (SPAs).
+-   **"Playwright not installed"**: Run `playwright install chromium`.
+-   **"API Key missing"**: Check your `.env` file is in the root folder and named exactly `.env`.
+-   **"Browser closes immediately"**: Ensure you aren't running inside a restricted container that blocks GUI apps.
 
 ---
 *Note: This project is for educational and development purposes. Always be cautious when giving automated agents access to your personal accounts.*

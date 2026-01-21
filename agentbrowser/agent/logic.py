@@ -2,6 +2,16 @@ from google import genai
 from google.genai import types
 import os
 from datetime import datetime
+import asyncio
+import logging
+
+# Configure logging to file to keep console clean
+logging.basicConfig(
+    filename='agent_debug.log', 
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class Agent:
     def __init__(self, api_key: str):
@@ -156,10 +166,42 @@ class Agent:
             temperature=0.1 
         )
         
-        response = await self.client.aio.models.generate_content(
-            model=self.model_id,
-            contents=pruned_contents,
-            config=config
-        )
+        max_retries = 5
+        base_delay = 2
         
-        return response
+        for attempt in range(max_retries):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model_id,
+                    contents=pruned_contents,
+                    config=config
+                )
+                
+                # Check for malformed response in candidates
+                if response.candidates:
+                    candidate = response.candidates[0]
+                    # Check if finish reason indicates malformed function call
+                    # We check string representation to be safe across library versions
+                    finish_reason = str(candidate.finish_reason)
+                    if "MALFORMED" in finish_reason:
+                        logger.warning(f"Malformed function call detected (Attempt {attempt+1}/{max_retries}): {finish_reason}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(base_delay)
+                            continue
+                
+                return response
+                
+            except Exception as e:
+                error_str = str(e)
+                logger.error(f"API Error (Attempt {attempt+1}/{max_retries}): {error_str}")
+                
+                # Retry on 503 (Unavailable), 429 (Too Many Requests), or "overloaded"
+                if any(x in error_str for x in ["503", "429", "overloaded", "UNAVAILABLE"]):
+                     if attempt < max_retries - 1:
+                        sleep_time = base_delay * (2 ** attempt)
+                        await asyncio.sleep(sleep_time)
+                        continue
+                
+                # If it's the last attempt or not a retryable error, re-raise
+                if attempt == max_retries - 1:
+                    raise e
