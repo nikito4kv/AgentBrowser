@@ -92,14 +92,18 @@ class Orchestrator:
             screenshot = await self.browser.capture_screenshot()
             self.save_debug_image(screenshot, "_init")
         
-        # Initialize History
+        # Initialize History with Safe Image Check
+        initial_parts = [types.Part.from_text(text=f"GOAL: {user_prompt}")]
+        if screenshot:
+            initial_parts.append(types.Part.from_bytes(data=screenshot, mime_type="image/jpeg"))
+        else:
+            console.print("[yellow]⚠️ Initial screenshot failed (timeout/loading). Sending text placeholder.[/yellow]")
+            initial_parts.append(types.Part.from_text(text="[System: Initial screenshot unavailable due to loading/error. Proceed with caution.]"))
+
         self.history = [
             types.Content(
                 role="user",
-                parts=[
-                    types.Part.from_text(text=f"GOAL: {user_prompt}"),
-                    types.Part.from_bytes(data=screenshot, mime_type="image/jpeg")
-                ]
+                parts=initial_parts
             )
         ]
         
@@ -215,17 +219,24 @@ class Orchestrator:
                     new_screenshot = await self.browser.capture_screenshot()
                     self.save_debug_image(new_screenshot)
                 
-                # Update History
+                # Update History with Safe Image Check
+                history_parts = [
+                    types.Part.from_function_response(
+                        name=call.name,
+                        response={"result": result_text}
+                    )
+                ]
+                
+                if new_screenshot:
+                    history_parts.append(types.Part.from_bytes(data=new_screenshot, mime_type="image/jpeg"))
+                else:
+                    console.print("[yellow]⚠️ Screenshot failed (timeout/loading). Sending text placeholder.[/yellow]")
+                    history_parts.append(types.Part.from_text(text="[System: Screenshot unavailable due to timeout. Page might be loading.]"))
+
                 self.history.append(
                     types.Content(
                         role="user",
-                        parts=[
-                            types.Part.from_function_response(
-                                name=call.name,
-                                response={"result": result_text}
-                            ),
-                            types.Part.from_bytes(data=new_screenshot, mime_type="image/jpeg")
-                        ]
+                        parts=history_parts
                     )
                 )
 

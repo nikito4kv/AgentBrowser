@@ -41,6 +41,25 @@
         const rect = targetElement.getBoundingClientRect();
         const clickX = rect.left + rect.width / 2;
         const clickY = rect.top + rect.height / 2;
+
+        // Check for occlusion
+        const topElement = document.elementFromPoint(clickX, clickY);
+        let isOccluded = false;
+        let occludedBy = null;
+
+        if (topElement && topElement !== targetElement && !targetElement.contains(topElement)) {
+            // If the element at the click point is not the target and not a descendant of the target,
+            // check if the target is a descendant of the top element (sometimes legitimate, like clicking a label wrapping an input)
+            // But usually, if we want to click X, and Y is on top, and Y is not X's child, X is covered.
+            
+            // Allow pointer-events: none pass-through logic simulation? 
+            // elementFromPoint already handles pointer-events.
+            
+            isOccluded = true;
+            occludedBy = topElement.tagName.toLowerCase() + 
+                (topElement.id ? '#' + topElement.id : '') +
+                (topElement.className ? '.' + topElement.className.split(' ').filter(c => c).join('.') : '');
+        }
         
         // Build element info string
         const elementInfo = targetElement.tagName.toLowerCase() + 
@@ -72,6 +91,8 @@
                 ariaLabel: elementAriaLabel,
                 text: elementText
             },
+            isOccluded: isOccluded,
+            occludedBy: occludedBy,
             isVisible: rect.width > 0 && rect.height > 0,
             isInteractable: !targetElement.disabled && 
                            targetElement.style.display !== 'none' &&

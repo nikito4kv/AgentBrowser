@@ -28,7 +28,8 @@ async def test_cot_structure():
     # So we check the system instruction generation.
     sys_instruction = agent._get_system_instruction()
     
-    assert "THOUGHT" in sys_instruction
-    assert "Observation" in sys_instruction
-    assert "Analysis" in sys_instruction
-    assert "Plan" in sys_instruction
+    assert "<WORKFLOW>" in sys_instruction
+    assert "ANALYZE" in sys_instruction
+    assert "LOCATE" in sys_instruction
+    assert "ACT" in sys_instruction
+    assert "VERIFY" in sys_instruction

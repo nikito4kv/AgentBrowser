@@ -1,21 +1,22 @@
 import pytest
+from datetime import datetime
 from agentbrowser.agent.logic import Agent
 
-def test_system_instruction_is_dynamic():
+def test_system_instruction_structure():
     agent = Agent(api_key="test")
     
-    # Initial state
-    instr1 = agent._get_system_instruction()
-    assert "План отсутствует." in instr1
-    assert "Память пуста." in instr1
+    instr = agent._get_system_instruction()
     
-    # Update plan
-    agent.update_plan(["Step 1", "Step 2"], 0)
-    instr2 = agent._get_system_instruction()
-    assert "0. Step 1 (ТЕКУЩИЙ)" in instr2
-    assert "1. Step 2" in instr2
+    # Check for key sections
+    assert "<SYSTEM_CAPABILITY>" in instr
+    assert "<TOOL_GUIDANCE>" in instr
+    assert "<WORKFLOW>" in instr
+    assert "<SAFETY_RULES>" in instr
     
-    # Save memory
-    agent.save_memory("price", "$100")
-    instr3 = agent._get_system_instruction()
-    assert "- price: $100" in instr3
+    # Check for dynamic date
+    current_date = datetime.today().strftime("%A, %B %d, %Y")
+    assert current_date in instr
+    
+    # Check for tool mentions
+    assert "browser_action" in instr
+    assert "read_page" in instr

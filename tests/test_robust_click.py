@@ -1,41 +1,33 @@
 import pytest
 import os
 from agentbrowser.browser.manager import BrowserManager
+from unittest.mock import AsyncMock
 
 @pytest.mark.asyncio
-async def test_robust_click_success():
+async def test_robust_click_occlusion():
     manager = BrowserManager()
     await manager.start()
     
-    file_path = "file://" + os.path.abspath("tests/test_overlap.html")
-    await manager.navigate(file_path)
+    # Override evaluate to return occlusion
+    manager.page.evaluate = AsyncMock(return_value={
+        "success": True, 
+        "coordinates": [10, 10], 
+        "isOccluded": True, 
+        "occludedBy": "Popup"
+    })
     
-    await manager.capture_annotated_screenshot()
+    # Try clicking without force
+    result = await manager.execute_action("left_click", ref="ref_1")
     
-    # Assuming ID 1 is the button
-    # In the current implementation, this should FAIL (timeout or interception)
-    # We want it to SUCCEED eventually.
+    # Should fail
+    assert "Action Failed" in result
+    assert "occluded by 'Popup'" in result
     
-    # We'll use a short timeout in the implementation logic later to speed up retries.
-    # For now, let's just call click_element.
+    # Try clicking WITH force
+    result_force = await manager.execute_action("left_click", ref="ref_1", force=True)
     
-    # To avoid waiting 30s during the 'Red' phase run, we can't easily change the default timeout 
-    # without changing the code.
-    
-    # So, I will write the test to expect success.
-    # When I run it now, it will likely timeout (fail).
-    
-    try:
-        result = await manager.click_element(1)
-    except Exception:
-        result = False
-        
-    # If the feature is NOT implemented, result might be True (if playwright forces it? no, standard doesn't)
-    # or it raises Exception.
-    
-    # Verification:
-    text = await manager.page.inner_text("#target-btn")
+    # Should succeed (manager calls click anyway)
+    manager.page.mouse.click.assert_called()
+    assert "Clicked element ref_1" in result_force
     
     await manager.close()
-    
-    assert text == "Clicked"

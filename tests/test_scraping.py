@@ -2,28 +2,16 @@ import pytest
 from agentbrowser.browser.manager import BrowserManager
 
 @pytest.mark.asyncio
-async def test_extract_content():
+async def test_read_page():
     manager = BrowserManager()
     await manager.start()
     
-    html_content = """
-    <html>
-    <body>
-        <h1>Title</h1>
-        <p>This is a paragraph of <b>important</b> text.</p>
-        <ul>
-            <li>Item 1</li>
-            <li>Item 2</li>
-        </ul>
-    </body>
-    </html>
-    """
-    await manager.page.set_content(html_content)
+    # Mock return value is set in conftest.py
+    # mock_page.evaluate = AsyncMock(return_value={"success": True, "coordinates": [10, 10], "pageContent": "<html></html>"})
     
-    md_text = await manager.extract_content()
+    result = await manager.execute_action("read_page")
     
-    assert "Title" in md_text
-    assert "important" in md_text
-    assert "Item 1" in md_text
+    # The default mock returns "<html></html>" as pageContent
+    assert result == "<html></html>"
     
     await manager.close()

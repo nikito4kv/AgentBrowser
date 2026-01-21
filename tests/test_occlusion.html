@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Occlusion Test</title>
+    <style>
+        #target-btn {
+            position: absolute;
+            top: 100px;
+            left: 100px;
+            width: 100px;
+            height: 50px;
+        }
+        #overlay {
+            position: absolute;
+            top: 50px;
+            left: 50px;
+            width: 200px;
+            height: 200px;
+            background-color: rgba(255, 0, 0, 0.5);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <button id="target-btn" onclick="document.getElementById('result').innerText = 'Clicked'">Target Button</button>
+    <div id="overlay">I am covering the button</div>
+    <div id="result">Not Clicked</div>
+</body>
+</html>

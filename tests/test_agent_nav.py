@@ -11,11 +11,18 @@ async def test_agent_chooses_navigate():
     agent = Agent(api_key="test")
     tools = agent.get_tools()
     
-    # Check if 'navigate' is in the function declarations
+    # Check if 'browser_action' is in the function declarations
     funcs = tools[0].function_declarations
-    nav_func = next((f for f in funcs if f.name == "navigate"), None)
-    back_func = next((f for f in funcs if f.name == "go_back"), None)
+    browser_action = next((f for f in funcs if f.name == "browser_action"), None)
     
-    assert nav_func is not None
-    assert back_func is not None
-    assert "url" in nav_func.parameters.properties
+    assert browser_action is not None
+    
+    # Check properties
+    props = browser_action.parameters.properties
+    assert "action" in props
+    assert "text" in props
+    
+    # Check if 'navigate' is an allowed action
+    actions = props["action"].enum
+    assert "navigate" in actions
+    assert "read_page" in actions

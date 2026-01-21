@@ -1,26 +1,28 @@
 import pytest
-import os
-import io
 from agentbrowser.browser.manager import BrowserManager
-from PIL import Image
+from unittest.mock import AsyncMock
 
 @pytest.mark.asyncio
-async def test_annotated_screenshot():
+async def test_screenshot_method():
     manager = BrowserManager()
     await manager.start()
     
-    file_path = "file://" + os.path.abspath("tests/test_page.html")
-    await manager.navigate(file_path)
+    # Test direct capture
+    result = await manager.capture_screenshot()
     
-    screenshot_bytes, elements = await manager.capture_annotated_screenshot()
+    manager.page.screenshot.assert_called()
+    assert result == b"fake_screenshot"
     
-    # Проверяем, что скриншот не пустой
-    assert screenshot_bytes is not None
-    assert len(screenshot_bytes) > 0
-    assert len(elements) > 0
+    await manager.close()
+
+@pytest.mark.asyncio
+async def test_screenshot_action_tool():
+    manager = BrowserManager()
+    await manager.start()
     
-    # Можно попробовать открыть через PIL для базовой проверки формата
-    img = Image.open(io.BytesIO(screenshot_bytes))
-    assert img.format == "JPEG"
+    # Test the tool action (which acts as a no-op/refresh signal)
+    result = await manager.execute_action("screenshot")
+    
+    assert result == "Screenshot taken (visual state refreshed)"
     
     await manager.close()

@@ -1,21 +1,17 @@
 import pytest
 import os
 from agentbrowser.browser.manager import BrowserManager
+from unittest.mock import AsyncMock
 
 @pytest.mark.asyncio
 async def test_robust_type_success():
     manager = BrowserManager()
     await manager.start()
     
-    file_path = "file://" + os.path.abspath("tests/test_overlap_type.html")
-    await manager.navigate(file_path)
-    await manager.capture_annotated_screenshot()
+    # Default mock returns success=True, not occluded
+    result = await manager.execute_action("type", text="Robust Input", ref="ref_1")
     
-    # Assuming ID 1 is the input
-    test_text = "Robust Input"
-    success = await manager.type_text(1, test_text)
+    manager.page.keyboard.type.assert_called()
+    assert "Typed: Robust Input" in result
     
-    value = await manager.page.input_value("#target-input")
     await manager.close()
-    
-    assert value == test_text

@@ -98,6 +98,12 @@ class BrowserManager:
         if not self.page:
             return b""
         try:
+            # Stabilization: Attempt to wait for network to be idle, but don't hang forever
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=1000)
+            except:
+                pass # Continue if it times out (some pages never idle)
+                
             return await self.page.screenshot(type="jpeg", quality=80, full_page=False)
         except Exception as e:
             print(f"Screenshot error: {e}")
@@ -113,6 +119,8 @@ class BrowserManager:
             return f"Navigated to {url}"
         except Exception as e:
             return f"Navigation failed: {e}"
+
+# ... (inside _type_text) ...
 
     async def _check_click_safety(self, ref: str = None, force: bool = False):
         """Checks if a click action is potentially destructive."""
@@ -174,6 +182,11 @@ class BrowserManager:
                 if not element_info.get("success", False):
                     return f"Failed to find element ref: {ref}"
                 
+                # Occlusion Check
+                if element_info.get("isOccluded", False) and not force:
+                    occluded_by = element_info.get("occludedBy", "unknown element")
+                    return f"Action Failed: Element {ref} is occluded by '{occluded_by}'. Use force=True to click anyway, or close the obstructing element."
+
                 x, y = element_info["coordinates"]
                 await self.page.mouse.click(x, y, button=button, click_count=click_count)
                 return f"Clicked element {ref} at {x}, {y}"
@@ -187,18 +200,23 @@ class BrowserManager:
     async def _type_text(self, text: str, ref: str = None, force: bool = False) -> str:
         if not self.page: return "Browser not started"
         try:
-            # Simple keyword check for typing
-            # if not force:
-            #     for keyword in self.RISKY_KEYWORDS:
-            #         if keyword in text.lower():
-            #             raise SecurityRiskError(f"Potentially destructive text input: '{keyword}'", risk_details=f"Input Text: '{text}'")
-
             if ref:
-                # Click first to focus if ref provided
-                await self._click("left_click", ref=ref, force=force) # Pass force to click if needed
-                await asyncio.sleep(0.5)
+                # Reliability Upgrade:
+                # 1. Get exact coordinates
+                element_info = await self._execute_js_from_file("browser_element_script.js", ref)
+                
+                if element_info and element_info.get("success"):
+                     x, y = element_info["coordinates"]
+                     
+                     # 2. Hard Click to focus (Triple click selects all text if present, ensuring focus)
+                     await self.page.mouse.click(x, y, click_count=3)
+                     await asyncio.sleep(0.1)
+                     
+                     # 3. Press Backspace to clear selected text (if any)
+                     await self.page.keyboard.press("Backspace")
             
-            await self.page.keyboard.type(text)
+            # 4. Type cleanly
+            await self.page.keyboard.type(text, delay=50)
             return f"Typed: {text}"
         except SecurityRiskError:
             raise
@@ -309,6 +327,8 @@ class BrowserManager:
             key = kwargs.get("text")
             await self.page.keyboard.press(key)
             return f"Pressed key {key}"
+        elif action == "screenshot":
+            return "Screenshot taken (visual state refreshed)"
             
         return f"Unknown action: {action}"
 
