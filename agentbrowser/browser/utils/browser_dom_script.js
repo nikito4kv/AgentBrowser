@@ -17,9 +17,19 @@
   }
 
   // Define the accessibility tree generation function on the window (in content script context)
-  window.__generateAccessibilityTree = function (filterType) {
+  window.__generateAccessibilityTree = function (inputOptions) {
     try {
       var result = [];
+      
+      // Parse input options (handle string legacy or object)
+      var options = {};
+      if (typeof inputOptions === 'string') {
+          options = { filter: inputOptions, prefix: "ref" };
+      } else {
+          options = inputOptions || {};
+          if (!options.filter) options.filter = "interactive";
+          if (!options.prefix) options.prefix = "ref";
+      }
 
       function getRole(element) {
         var role = element.getAttribute("role");
@@ -368,7 +378,7 @@
 
           // If not found, create a new ref
           if (!ref) {
-            ref = "ref_" + ++window.__claudeRefCounter;
+            ref = options.prefix + "_" + ++window.__claudeRefCounter;
             window.__claudeElementMap[ref] = new WeakRef(element);
           }
 
@@ -408,10 +418,8 @@
         }
       }
 
-      var options = {
-        filter: filterType,
-      };
-
+      // No longer initializing 'options' here as it's done at the top
+      
       if (document.body) {
         processElement(document.body, 0, options);
       }
@@ -426,7 +434,8 @@
 
       // Filter out empty generic elements
       var filteredResult = result.filter(function (line) {
-        return !/^\s*- generic \[ref=ref_\d+\]$/.test(line);
+        var prefixRegex = new RegExp("^\\s*- generic \\[ref=" + options.prefix + "_\\d+\\]$");
+        return !prefixRegex.test(line);
       });
 
       return {
