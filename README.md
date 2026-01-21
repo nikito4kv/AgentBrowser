@@ -40,7 +40,7 @@ A powerful, autonomous browser automation agent powered by Google's Gemini 2.5 P
 
 1. **Clone the repository**:
    ```bash
-   git clone <repository-url>
+   git clone [<repository-url>](https://github.com/nikito4kv/ai-browser-use.git)
    cd AgentBrowser
    ```
 
