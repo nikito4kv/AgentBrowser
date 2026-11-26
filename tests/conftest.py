@@ -31,5 +31,36 @@ def mock_playwright_manager():
         mock_page.keyboard.press = AsyncMock()
         mock_page.mouse.wheel = AsyncMock()
         mock_page.title = AsyncMock(return_value="Mock Title")
-        
+
+        # BrowserManager works through frames (main frame for plain refs, child
+        # frames for `frame{i}_ref_N`): JS helpers run via frame.evaluate and
+        # elements are driven through handles from frame.evaluate_handle.
+        mock_page.main_frame = make_frame()
+        mock_page.frames = [mock_page.main_frame]
+
         yield mock_ap
+
+
+def make_handle():
+    """Element handle double: every action the manager performs is awaitable."""
+    handle = MagicMock()
+    handle.click = AsyncMock()
+    handle.type = AsyncMock()
+    handle.scroll_into_view_if_needed = AsyncMock()
+    return handle
+
+
+def make_frame(url="https://example.test/"):
+    """Frame double returning a healthy, unoccluded element and an empty page tree."""
+    frame = MagicMock()
+    frame.url = url
+    frame.evaluate = AsyncMock(return_value={
+        "success": True,
+        "coordinates": [10, 10],
+        "isOccluded": False,
+        "occludedBy": None,
+        "attributes": {"text": "Target", "ariaLabel": ""},
+        "pageContent": "<html></html>",
+    })
+    frame.evaluate_handle = AsyncMock(return_value=make_handle())
+    return frame

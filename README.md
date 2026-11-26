@@ -7,6 +7,7 @@
 [![Python](https://img.shields.io/badge/python-3.13%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Playwright](https://img.shields.io/badge/Playwright-1.57%2B-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/python/)
 [![Gemini](https://img.shields.io/badge/Gemini-2.5%20Pro%20%2B%20Flash-4285F4?logo=googlegemini&logoColor=white)](https://ai.google.dev/)
+[![CI](https://github.com/nikito4kv/AgentBrowser/actions/workflows/ci.yml/badge.svg)](https://github.com/nikito4kv/AgentBrowser/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-pytest%20(mocked%2C%20no%20API%20key)-blue?logo=pytest&logoColor=white)](#tests)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -145,19 +146,19 @@ To use an account, log in manually in the opened browser window first; the profi
 
 ## Tests
 
-18 test functions in 16 files (`grep -c "def test_" tests/*.py`). They use a `conftest.py` fixture that mocks `async_playwright`, so no browser, network or API key is needed. Run them with:
+29 test functions (30 test cases) in 16 files (`grep -c "def test_" tests/*.py`). A `conftest.py` fixture mocks `async_playwright` and gives `BrowserManager` frame and element-handle doubles, so no browser, network or API key is needed. Run them with:
 
 ```bash
 uv run python -m pytest -q       # plain `pytest` cannot import the package: the project is not installed
 ```
 
-Current result (Python 3.13, locked dependencies, no `GEMINI_API_KEY`): **12 passed, 6 failed**.
+Current result (Python 3.13, locked dependencies, no `GEMINI_API_KEY`): **30 passed**. The same command runs in GitHub Actions on every push and pull request (`.github/workflows/ci.yml`).
 
-Known issue: the 6 failing tests (`test_click`, `test_type`, `test_robust_click`, `test_robust_type`, `test_occlusion`, `test_scraping`) were written against an earlier version of `BrowserManager` (page-level `mouse.click` / `page.evaluate`) and have not been updated after the move to element handles and per-frame DOM reading. The passing tests cover history pruning, the system prompt and tool schema, the browser lifecycle, screenshots, scrolling and the stealth setup.
+They cover: ref and coordinate clicks (left/right/double, main frame and iframe refs), occlusion refusal and `force`, the risky-keyword confirmation, typing (focus, clear, type with delay, blocked field), `read_page` across frames, history pruning, the system prompt and tool schema, the browser lifecycle, screenshots, scrolling and the stealth setup. The mocks check how the code drives Playwright; the real page behaviour is checked separately below.
 
 ### Verified behaviour
 
-Because the mocked tests lag behind the code, the behaviour was also checked against the real fixture pages in `tests/` with a real Chrome (no model, no network). `read_page` + `left_click` on `test_occlusion.html` and `test_overlap.html` returned the occlusion error shown above; a `force=True` click was reported as `Clicked element ref_2` but the overlay swallowed it (the page still read "Not Clicked"); typing into the covered input of `test_overlap_type.html` failed with Playwright's "`<div id="overlay"></div>` intercepts pointer events" timeout and succeeded with `force=True`; and a button labelled "Delete account" raised `SecurityRiskError`.
+Because the unit tests use mocks, the behaviour was also checked once by hand against the real fixture pages in `tests/` with a real Chrome (no model, no network). `read_page` + `left_click` on `test_occlusion.html` and `test_overlap.html` returned the occlusion error shown above; a `force=True` click was reported as `Clicked element ref_2` but the overlay swallowed it (the page still read "Not Clicked"); typing into the covered input of `test_overlap_type.html` failed with Playwright's "`<div id="overlay"></div>` intercepts pointer events" timeout and succeeded with `force=True`; and a button labelled "Delete account" raised `SecurityRiskError`.
 
 ## Safety & limitations
 
@@ -173,7 +174,7 @@ This is a hobby/portfolio project, not a hardened product.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The three scripts in `agentbrowser/browser/utils/` are adapted from Microsoft Playwright code (Apache 2.0) and keep their original notice in the file headers.
+MIT, see [LICENSE](LICENSE). Two of the JS helpers are modified from Microsoft Playwright code (Apache 2.0); see [NOTICE](NOTICE).
 
 ---
 
